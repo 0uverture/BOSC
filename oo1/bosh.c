@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <unistd.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "parser.h"
@@ -18,8 +19,12 @@
 #define HOSTNAMEMAX 100
 
 /* --- use the /proc filesystem to obtain the hostname --- */
-char *gethostname(char *hostname)
+char *gethostname1(char *hostname)
 {
+  int res = gethostname(hostname, HOSTNAMEMAX); // From unistd.h
+  if (res != 0) { // Succeeded
+    return hostname;
+  }
   hostname = "";
   return hostname;
 }
@@ -41,19 +46,19 @@ int main(int argc, char* argv[]) {
   int terminate = 0;
   Shellcmd shellcmd;
   
-  if (gethostname(hostname)) {
+  if (gethostname1(hostname)) {
 
     /* parse commands until exit or ctrl-c */
     while (!terminate) {
       printf("%s", hostname);
       if (cmdline = readline(":# ")) {
-	if(*cmdline) {
-	  add_history(cmdline);
-	  if (parsecommand(cmdline, &shellcmd)) {
-	    terminate = executeshellcmd(&shellcmd);
-	  }
-	}
-	free(cmdline);
+      	if(*cmdline) {
+      	  add_history(cmdline);
+      	  if (parsecommand(cmdline, &shellcmd)) {
+      	    terminate = executeshellcmd(&shellcmd);
+      	  }
+      	}
+      	free(cmdline);
       } else terminate = 1;
     }
     printf("Exiting bosh.\n");
