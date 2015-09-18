@@ -74,7 +74,8 @@ int parsecommand(char *cmdline, Shellcmd *shellcmd)
         case PIPE:
         	newtoken = 0;
         	break;
-              case BG:
+        
+        case BG:
         	n = nexttoken(t, &tok);
         	if (n == 0)
         	  {

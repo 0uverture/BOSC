@@ -17,7 +17,7 @@ void printshellcmd(Shellcmd *shellcmd)
     char **printcmd = cmd;
     printf("    [");
     while (*printcmd != NULL) {
-      printf("%s ", *printcmd++); // print the cmd and arguments
+      printf(" %s ", *printcmd++); // print the cmd and arguments
     }
     printf("]\n");
 

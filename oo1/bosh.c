@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include "redirect.h"
 #include "parser.h"
 #include "print.h"
 
@@ -33,7 +34,22 @@ char *gethostname1(char *hostname)
 int executeshellcmd (Shellcmd *shellcmd)
 {
   printshellcmd(shellcmd);
+  Cmd *cmdlist = shellcmd->the_cmds;
+  while (cmdlist != NULL) {
+    char **cmd = cmdlist->cmd;
+    cmdlist = cmdlist->next;
 
+    char **printcmd = cmd;
+
+    if(strcmp("ls", *printcmd) == 0) // This comparison works. Looking at first command.
+    {
+      printf("Command is ls?: %s\n", *printcmd);
+    }
+
+    while (*printcmd != NULL) {
+      printf(" %s ", *printcmd++); // print the cmd and arguments
+    }
+  }
   return 0;
 }
 
