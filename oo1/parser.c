@@ -136,15 +136,15 @@ int nexttoken( char *s, char **tok)
 
   *tok = cp;
   while (isspace(c = *s++) && c);
-  if (c == '\0')
+  if (c == '\0') // Is c end-of-string?
   {
-    *cp++ = '\0';
+    *cp++ = '\0'; // End cp with end-of-string
     return 0;
   }
-  if (isspec(c))
+  if (isspec(c)) // Is c special?
   {
-    *cp++ = c;
-    *cp++ = '\0';
+    *cp++ = c; // Add c
+    *cp++ = '\0'; // End cp with end-of-string
   }
   else
   {
@@ -160,7 +160,7 @@ int nexttoken( char *s, char **tok)
   return s - s0;
 }
 
-int acmd (char *s, Cmd **cmd)
+int acmd (char *s, Cmd **cmd) // 
 {
   char *tok;
   int n, cnt = 0;
