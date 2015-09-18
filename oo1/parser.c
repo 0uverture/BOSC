@@ -64,61 +64,65 @@ int parsecommand(char *cmdline, Shellcmd *shellcmd)
     while (newtoken) {
       n = nexttoken(t, &tok);
       if (n == 0)
-	{
-	  return 1;
-	}
+    	{
+    	  return 1;
+    	}
       t += n;
 
       switch(*tok) {
-      case PIPE:
-	newtoken = 0;
-	break;
-      case BG:
-	n = nexttoken(t, &tok);
-	if (n == 0)
-	  {
-	    shellcmd->background = 1;
-	    return 1;
-	  }
-	else
-	  {
-	    fprintf(stderr, "illegal bakgrounding\n");
-	    return -1;
-	  }
-	newtoken = 0;
-	break;
-      case RIN:
-	if (shellcmd->rd_stdin != NULL)
-	  {
-	    fprintf(stderr, "duplicate redirection of stdin\n");
-	    return -1;
-	  }
-	if ((n = nexttoken(t, &(shellcmd->rd_stdin))) < 0) 
-	  return -1;
-	if (!isidentifier(shellcmd->rd_stdin))
-	  {
-	    fprintf(stderr, "Illegal filename: \"%s\"\n", shellcmd->rd_stdin);
-	    return -1;
-	  }
-	t += n;
-	break;
-      case RUT:
-	if (shellcmd->rd_stdout != NULL)
-	  {
-	    fprintf(stderr, "duplicate redirection of stdout\n");
-	    return -1;
-	  }
-	if ((n = nexttoken(t, &(shellcmd->rd_stdout))) < 0) 
-	  return -1;
-	if (!isidentifier(shellcmd->rd_stdout))
-	  {
-	    fprintf(stderr, "Illegal filename: \"%s\"\n", shellcmd->rd_stdout);
-	    return -1;
-	  }
-	t += n;
-	break;
-      default:
-	return -1;
+
+        case PIPE:
+        	newtoken = 0;
+        	break;
+              case BG:
+        	n = nexttoken(t, &tok);
+        	if (n == 0)
+        	  {
+        	    shellcmd->background = 1;
+        	    return 1;
+        	  }
+        	else
+        	  {
+        	    fprintf(stderr, "illegal bakgrounding\n");
+        	    return -1;
+        	  }
+        	newtoken = 0;
+        	break;
+
+        case RIN:
+        	if (shellcmd->rd_stdin != NULL)
+        	  {
+        	    fprintf(stderr, "duplicate redirection of stdin\n");
+        	    return -1;
+        	  }
+        	if ((n = nexttoken(t, &(shellcmd->rd_stdin))) < 0) 
+        	  return -1;
+        	if (!isidentifier(shellcmd->rd_stdin))
+        	  {
+        	    fprintf(stderr, "Illegal filename: \"%s\"\n", shellcmd->rd_stdin);
+        	    return -1;
+        	  }
+        	t += n;
+        	break;
+
+        case RUT:
+        	if (shellcmd->rd_stdout != NULL)
+        	  {
+        	    fprintf(stderr, "duplicate redirection of stdout\n");
+        	    return -1;
+        	  }
+        	if ((n = nexttoken(t, &(shellcmd->rd_stdout))) < 0) 
+        	  return -1;
+        	if (!isidentifier(shellcmd->rd_stdout))
+        	  {
+        	    fprintf(stderr, "Illegal filename: \"%s\"\n", shellcmd->rd_stdout);
+        	    return -1;
+        	  }
+        	t += n;
+        	break;
+
+        default:
+          return -1;
       }
     }
   } while (1);
@@ -133,26 +137,26 @@ int nexttoken( char *s, char **tok)
   *tok = cp;
   while (isspace(c = *s++) && c);
   if (c == '\0')
-    {
-      *cp++ = '\0';
-      return 0;
-    }
+  {
+    *cp++ = '\0';
+    return 0;
+  }
   if (isspec(c))
-    {
-      *cp++ = c;
-      *cp++ = '\0';
-    }
+  {
+    *cp++ = c;
+    *cp++ = '\0';
+  }
   else
-    {
-      *cp++ = c;
-      do
-	{
-	  c = *cp++ = *s++;
-	} while (!isspace(c) && !isspec(c) && (c != '\0'));
-      --s;
-      --cp;
-      *cp++ = '\0';
-    }
+  {
+    *cp++ = c;
+    do
+  	{
+  	  c = *cp++ = *s++;
+  	} while (!isspace(c) && !isspec(c) && (c != '\0'));
+    --s;
+    --cp;
+    *cp++ = '\0';
+  }
   return s - s0;
 }
 
@@ -168,27 +172,27 @@ int acmd (char *s, Cmd **cmd)
   while (1) {
     n = nexttoken(s, &tok);
     if (n == 0 || isspec(*tok))
-      {
-	*cmd = cmd0;
-	*pp++ = NULL;
-	return cnt;
-      }
+    {
+    	*cmd = cmd0;
+    	*pp++ = NULL;
+    	return cnt;
+    }
     else
-      {
-	*pp++ = tok;
-	cnt += n;
-	s += n;
-      }
+    {
+      *pp++ = tok;
+      cnt += n;
+      s += n;
+    }
   }
 }
 
 int isidentifier (char *s)
 {
   while (*s)
-    {
-      char *p = strrchr (IDCHARS,  *s);
-      if (! isalnum(*s++) && (p == NULL))
-	return 0;
-    }
+  {
+    char *p = strrchr (IDCHARS,  *s);
+    if (! isalnum(*s++) && (p == NULL))
+      return 0;
+  }
   return 1;
 }
