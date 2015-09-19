@@ -10,6 +10,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "redirect.h"
@@ -41,28 +42,30 @@ int executeshellcmd (Shellcmd *shellcmd)
 
     char **printcmd = cmd;
 
-    int runinbg = 0;
+    int runinbg = 0; // Bool in int form
+
 
     char commandwithargs[COMMANDANDARGSMAX] = "";
     while (*printcmd != NULL) { // Iterate command & arguments
-      if(strcmp("&", *printcmd) == 0) // This comparison works. Looking at command without its arguments.
+      printf("*printcmd: '%s'\n", *printcmd);
+      if(shellcmd->background == 1) // A "&" has been read
       {
         printf("Command should be run in bg.\n");
-        // Change "shellcmd"...
-        shellcmd->background = 1;
-        runinbg = 1;
+        runinbg = 1; // Yes, we should run the command in bg
+        *printcmd++;
       }
       else {
         strcat(commandwithargs, " "); // Add space
         strcat(commandwithargs, *printcmd++); // Add argument
       }
-    } // Iterating command (first) + arguments
+    }
 
     // Print Shellcmd
     printshellcmd(shellcmd);
 
     // Execution
-    if (runinbg == 1){
+    if (runinbg == 1) {
+      printf("Running in bg...\n");
       executecommandinbg(commandwithargs);
     }
     else { // Execute command and wait for it
@@ -87,7 +90,7 @@ int executecommandandwait(char *commandwithargs) {
   else { // Parent process
     int status;
     int pidres = waitpid(pid, &status, 0);
-    printf("Command finished: %s\n", commandwithargs);
+    printf("Command finished: %s, with status: %d\n", commandwithargs, status);
   }
 }
 
@@ -100,10 +103,14 @@ int executecommandinbg(char *commandwithargs) {
       commandwithargs,
       NULL
     };
-    execvp(args[0], args);
+    int status = execvp(args[0], args);
+    printf("BG status: %d\n", status);
   }
-  else { // Parent process
+  else if (pid > 0) { // Parent process
     printf("I don't care for my child.\n");
+  }
+  else { // Crashed
+    printf("Fork messed up?\n");
   }
 }
 
