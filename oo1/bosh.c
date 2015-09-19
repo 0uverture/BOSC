@@ -48,24 +48,16 @@ int executeshellcmd (Shellcmd *shellcmd)
     char commandwithargs[COMMANDANDARGSMAX] = "";
     while (*printcmd != NULL) { // Iterate command & arguments
       printf("*printcmd: '%s'\n", *printcmd);
-      if(shellcmd->background == 1) // A "&" has been read
-      {
-        printf("Command should be run in bg.\n");
-        runinbg = 1; // Yes, we should run the command in bg
-        *printcmd++;
-      }
-      else {
-        strcat(commandwithargs, " "); // Add space
-        strcat(commandwithargs, *printcmd++); // Add argument
-      }
+      
+      strcat(commandwithargs, " "); // Add space
+      strcat(commandwithargs, *printcmd++); // Add argument
     }
 
     // Print Shellcmd
     printshellcmd(shellcmd);
 
     // Execution
-    if (runinbg == 1) {
-      printf("Running in bg...\n");
+    if (shellcmd->background == 1) {
       executecommandinbg(commandwithargs);
     }
     else { // Execute command and wait for it
