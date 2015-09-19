@@ -18,6 +18,7 @@
 
 /* --- symbolic constants --- */
 #define HOSTNAMEMAX 100
+#define COMMANDANDARGSMAX 256
 
 /* --- use the /proc filesystem to obtain the hostname --- */
 char *gethostname1(char *hostname)
@@ -41,31 +42,34 @@ int executeshellcmd (Shellcmd *shellcmd)
 
     char **printcmd = cmd;
 
-    if(strcmp("ls", *printcmd) == 0) // This comparison works. Looking at command without its arguments.
+    /*if(strcmp("ls", *printcmd) == 0) // This comparison works. Looking at command without its arguments.
     {
       printf("Command is ls?: %s\n", *printcmd);
-      pid_t pid = fork();
-      if (pid == 0) { // Child process
-        char *args[] = {
+    }*/
+
+    char commandwithargs[COMMANDANDARGSMAX] = "";
+    while (*printcmd != NULL) { // Iterate command & arguments
+      strcat(commandwithargs, " ");
+      strcat(commandwithargs, *printcmd++);
+    } // Iterating command (first) + arguments
+
+    pid_t pid = fork();
+    if (pid == 0) { // Child process
+      char *args[] = {
         "/bin/bash",
         "-c",
-        *printcmd,
+        commandwithargs,
         NULL
       };
       //args[0] = strcat("./", *printcmd);
       //args[1] = NULL;
       execvp(args[0], args);
-      }
-      else { // Parent process
-        int status;
-        int pidres = waitpid(pid, &status, 0);
-        printf("Command finished: %s\n", *printcmd);
-      }
     }
-
-    /* while (*printcmd != NULL) { // Iterate command & arguments
-      printf(" %s ", *printcmd++); // print the cmd and arguments
-    } */ // Leftover code from print.c
+    else { // Parent process
+      int status;
+      int pidres = waitpid(pid, &status, 0);
+      printf("Command finished: %s\n", commandwithargs);
+    }
   }
   return 0;
 }
