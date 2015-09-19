@@ -44,7 +44,9 @@ int executeshellcmd (Shellcmd *shellcmd)
     if(strcmp("ls", *printcmd) == 0) // This comparison works. Looking at command without its arguments.
     {
       printf("Command is ls?: %s\n", *printcmd);
-      char *args[] = {
+      pid_t pid = fork();
+      if (pid == 0) { // Child process
+        char *args[] = {
         "/bin/bash",
         "-c",
         *printcmd,
@@ -53,11 +55,17 @@ int executeshellcmd (Shellcmd *shellcmd)
       //args[0] = strcat("./", *printcmd);
       //args[1] = NULL;
       execvp(args[0], args);
+      }
+      else { // Parent process
+        int status;
+        int pidres = waitpid(pid, &status, 0);
+        printf("Command finished: %s\n", *printcmd);
+      }
     }
 
-    while (*printcmd != NULL) { // Iterate command & arguments
+    /* while (*printcmd != NULL) { // Iterate command & arguments
       printf(" %s ", *printcmd++); // print the cmd and arguments
-    }
+    } */ // Leftover code from print.c
   }
   return 0;
 }
