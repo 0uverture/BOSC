@@ -36,17 +36,26 @@ int executeshellcmd (Shellcmd *shellcmd)
   printshellcmd(shellcmd);
   Cmd *cmdlist = shellcmd->the_cmds;
   while (cmdlist != NULL) {
-    char **cmd = cmdlist->cmd;
-    cmdlist = cmdlist->next;
+    char **cmd = cmdlist->cmd; // Store command in new pointer
+    cmdlist = cmdlist->next; // Next command
 
     char **printcmd = cmd;
 
-    if(strcmp("ls", *printcmd) == 0) // This comparison works. Looking at first command.
+    if(strcmp("ls", *printcmd) == 0) // This comparison works. Looking at command without its arguments.
     {
       printf("Command is ls?: %s\n", *printcmd);
+      char *args[] = {
+        "/bin/bash",
+        "-c",
+        *printcmd,
+        NULL
+      };
+      //args[0] = strcat("./", *printcmd);
+      //args[1] = NULL;
+      execvp(args[0], args);
     }
 
-    while (*printcmd != NULL) {
+    while (*printcmd != NULL) { // Iterate command & arguments
       printf(" %s ", *printcmd++); // print the cmd and arguments
     }
   }
