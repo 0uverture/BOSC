@@ -34,7 +34,6 @@ char *gethostname1(char *hostname)
 /* --- execute a shell command --- */
 int executeshellcmd (Shellcmd *shellcmd)
 {
-  printshellcmd(shellcmd);
   Cmd *cmdlist = shellcmd->the_cmds;
   while (cmdlist != NULL) {
     char **cmd = cmdlist->cmd; // Store command in new pointer
@@ -42,36 +41,70 @@ int executeshellcmd (Shellcmd *shellcmd)
 
     char **printcmd = cmd;
 
-    /*if(strcmp("ls", *printcmd) == 0) // This comparison works. Looking at command without its arguments.
-    {
-      printf("Command is ls?: %s\n", *printcmd);
-    }*/
+    int runinbg = 0;
 
     char commandwithargs[COMMANDANDARGSMAX] = "";
     while (*printcmd != NULL) { // Iterate command & arguments
-      strcat(commandwithargs, " ");
-      strcat(commandwithargs, *printcmd++);
+      if(strcmp("&", *printcmd) == 0) // This comparison works. Looking at command without its arguments.
+      {
+        printf("Command should be run in bg.\n");
+        // Change "shellcmd"...
+        shellcmd->background = 1;
+        runinbg = 1;
+      }
+      else {
+        strcat(commandwithargs, " "); // Add space
+        strcat(commandwithargs, *printcmd++); // Add argument
+      }
     } // Iterating command (first) + arguments
 
-    pid_t pid = fork();
-    if (pid == 0) { // Child process
-      char *args[] = {
-        "/bin/bash",
-        "-c",
-        commandwithargs,
-        NULL
-      };
-      //args[0] = strcat("./", *printcmd);
-      //args[1] = NULL;
-      execvp(args[0], args);
+    // Print Shellcmd
+    printshellcmd(shellcmd);
+
+    // Execution
+    if (runinbg == 1){
+      executecommandinbg(commandwithargs);
     }
-    else { // Parent process
-      int status;
-      int pidres = waitpid(pid, &status, 0);
-      printf("Command finished: %s\n", commandwithargs);
+    else { // Execute command and wait for it
+      executecommandandwait(commandwithargs);
     }
+    
   }
   return 0;
+}
+
+int executecommandandwait(char *commandwithargs) {
+  pid_t pid = fork();
+  if (pid == 0) { // Child process
+    char *args[] = {
+      "/bin/bash",
+      "-c",
+      commandwithargs,
+      NULL
+    };
+    execvp(args[0], args);
+  }
+  else { // Parent process
+    int status;
+    int pidres = waitpid(pid, &status, 0);
+    printf("Command finished: %s\n", commandwithargs);
+  }
+}
+
+int executecommandinbg(char *commandwithargs) {
+  pid_t pid = fork();
+  if (pid == 0) { // Child process
+    char *args[] = {
+      "/bin/bash",
+      "-c",
+      commandwithargs,
+      NULL
+    };
+    execvp(args[0], args);
+  }
+  else { // Parent process
+    printf("I don't care for my child.\n");
+  }
 }
 
 /* --- main loop of the simple shell --- */
