@@ -42,7 +42,7 @@ int executeshellcmd (Shellcmd *shellcmd)
     cmdlist = cmdlist->next; // Next command
 
     // Print Shellcmd
-    //printshellcmd(shellcmd);
+    printshellcmd(shellcmd);
 
     // Execution background vs foreground
     char *rd_stdin = shellcmd->rd_stdin;
