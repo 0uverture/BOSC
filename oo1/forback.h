@@ -9,7 +9,7 @@
 #ifndef _FORBACK_H
 #define _FORBACK_H
 
-int foregroundcmd(char *, char*[]);
-int backgroundcmd(char *, char*[]);
+int foregroundcmd(char *, char*[], char *, char *);
+int backgroundcmd(char *, char*[], char *, char *);
 
 #endif

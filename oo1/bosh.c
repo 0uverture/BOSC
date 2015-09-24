@@ -42,14 +42,16 @@ int executeshellcmd (Shellcmd *shellcmd)
     cmdlist = cmdlist->next; // Next command
 
     // Print Shellcmd
-    printshellcmd(shellcmd);
+    //printshellcmd(shellcmd);
 
-    // Execution
+    // Execution background vs foreground
+    char *rd_stdin = shellcmd->rd_stdin;
+    char *rd_stdout = shellcmd->rd_stdout;
     if (shellcmd->background == 1) {
-      foregroundcmd(*cmd, cmd);
+      backgroundcmd(*cmd, cmd, rd_stdin, rd_stdout);
     }
     else { // Execute command and wait for it
-      backgroundcmd(*cmd, cmd);
+      foregroundcmd(*cmd, cmd, rd_stdin, rd_stdout);
     }
     
   }

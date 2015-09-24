@@ -17,6 +17,38 @@
 
 #include "redirect.h"
 
+int redirect_stdinandout(char *infilename, char *outfilename)
+{
+	if (infilename != NULL)
+		redirect_stdin(infilename);
+	if (outfilename != NULL)
+		redirect_stdout(outfilename);
+}
+
+int redirect_stdin(char *infilename)
+{
+	/* manipulate the file descriptor of the child process */
+	int fid = open(infilename, O_RDONLY);
+	/* Replace stdin of the child process with fid */
+	close(0); /* 0 = stdin */
+	dup(fid);
+	/* Close fid */
+	close(fid);
+  	return 0;
+}
+
+int redirect_stdout(char *outfilename)
+{
+	/* manipulate the file descriptor of the child process */
+	int fid = open(outfilename, O_WRONLY|O_CREAT);
+	/* Replace stdin of the child process with fid */
+	close(1); /* 0 = stdin */
+	dup(fid);
+	/* Close fid */
+	close(fid);
+  	return 0;
+}
+
 /* start the program specified by filename with the arguments in argv 
    in a new process that has its stdin redirected to infilename and
    wait for termination */
