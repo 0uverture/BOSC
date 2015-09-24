@@ -15,6 +15,7 @@
 #include <readline/history.h>
 #include "redirect.h"
 #include "parser.h"
+#include "forback.h"
 #include "print.h"
 
 /* --- symbolic constants --- */
@@ -40,35 +41,22 @@ int executeshellcmd (Shellcmd *shellcmd)
     char **cmd = cmdlist->cmd; // Store command in new pointer
     cmdlist = cmdlist->next; // Next command
 
-    char **printcmd = cmd;
-
-    int runinbg = 0; // Bool in int form
-
-
-    char commandwithargs[COMMANDANDARGSMAX] = "";
-    while (*printcmd != NULL) { // Iterate command & arguments
-      printf("*printcmd: '%s'\n", *printcmd);
-      
-      strcat(commandwithargs, " "); // Add space
-      strcat(commandwithargs, *printcmd++); // Add argument
-    }
-
     // Print Shellcmd
     printshellcmd(shellcmd);
 
     // Execution
     if (shellcmd->background == 1) {
-      executecommandinbg(commandwithargs);
+      foregroundcmd(*cmd, cmd);
     }
     else { // Execute command and wait for it
-      executecommandandwait(commandwithargs);
+      backgroundcmd(*cmd, cmd);
     }
     
   }
   return 0;
 }
 
-int executecommandandwait(char *commandwithargs) {
+/*int executecommandandwait(char *commandwithargs) {
   pid_t pid = fork();
   if (pid == 0) { // Child process
     char *args[] = {
@@ -107,7 +95,7 @@ int executecommandinbg(char *commandwithargs) {
   else if (pid1 > 0) { // Parent process
     printf("I don't need to care about what goes on in the child process.\n");
   }
-}
+}*/
 
 /* --- main loop of the simple shell --- */
 int main(int argc, char* argv[]) {
