@@ -84,36 +84,28 @@ int executecommandandwait(char *commandwithargs) {
     int pidres = waitpid(pid, &status, 0);
     printf("Command finished: %s, with status: %d\n", commandwithargs, status);
   }
+  else {
+    printf("pid craaaaaaassh.\n");
+  }
 }
 
 int executecommandinbg(char *commandwithargs) {
   pid_t pid1 = fork();
   if (pid1 == 0) { // Child process
+    printf("Entered child process.\n");
     char *args[] = {
       "/bin/bash",
       "-c",
       commandwithargs,
       NULL
     };
+    char[] cmd = commandwithargs[0];
+
     int status = execvp(args[0], args);
-    printf("BG status: %d\n", status);
+    printf("Background process finished: %s, with status: %d\n", commandwithargs, status);
   }
   else if (pid1 > 0) { // Parent process
-    pid_t pid2 = fork();
-    if (pid2 == 0) { // Child process
-      int status;
-      waitpid(pid1, &status, 0);
-      printf("Background process finished: %s, with status: %d\n", commandwithargs, status);
-    }
-    else if (pid2 > 0) {
-      printf("I don't need to care here.\n");
-    }
-    else {
-      printf("pid2 craaaaaaassh.\n");
-    }
-  }
-  else {
-    printf("pid1 craaaaaaassh.\n");
+    printf("I don't need to care about what goes on in the child process.\n");
   }
 }
 
