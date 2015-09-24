@@ -46,5 +46,4 @@ int backgroundcmd(char *filename, char *argv[], char *infilename, char *outfilen
   } else { /* parent */
     printf("B: Not waiting for child.\n");
   }
-  execvp(filename, argv);
 }
