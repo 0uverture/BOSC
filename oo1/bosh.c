@@ -103,6 +103,9 @@ int main(int argc, char* argv[]) {
       	if(*cmdline) {
       	  add_history(cmdline);
       	  if (parsecommand(cmdline, &shellcmd)) {
+            if (checkIfExit(cmdline)) {
+              return EXIT_SUCCESS;
+            }
       	    terminate = executeshellcmd(&shellcmd);
       	  }
       	}
@@ -110,8 +113,15 @@ int main(int argc, char* argv[]) {
       } else terminate = 1;
     }
     printf("Exiting bosh.\n");
-  }    
-    
+  }
   return EXIT_SUCCESS;
+}
+
+int checkIfExit(char *firstCmd)
+{
+  if(strcmp(firstCmd, "exit") == 0){ // they are equal
+    return 1;
+  }
+  return 0;
 }
 
