@@ -41,13 +41,17 @@ int executeshellcmd (Shellcmd *shellcmd)
   while (cmdlist != NULL) {
     char **cmd = cmdlist->cmd; // Current command
     cmdlist = cmdlist->next; // Iteration
-    char **scndCmd;
-    if (cmdlist != NULL)
+
+    // Retrieve next command if any
+    char **scndCmd = NULL;
+    if (cmdlist != NULL) // if true: pipe was used
       scndCmd = cmdlist->cmd; // Next command
-    printf("%s\n", cmd[0]);
+
+    // Control-prints:
+    printf("First command: '%s'\n", cmd[0]);
     if (scndCmd != NULL)
-      printf("%s\n", scndCmd[0]);
-    // Print Shellcmd
+      printf("Second command: '%s'\n", scndCmd[0]);
+    
     printshellcmd(shellcmd);
 
     // Execution

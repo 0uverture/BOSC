@@ -19,10 +19,12 @@
 
 int redirect_stdinandout(char *infilename, char *outfilename)
 {
-	if (infilename != NULL)
+	if (infilename != NULL) {
 		redirect_stdin(infilename);
-	if (outfilename != NULL)
+	}
+	if (outfilename != NULL) {
 		redirect_stdout(outfilename);
+	}
 }
 
 int redirect_stdin(char *infilename)

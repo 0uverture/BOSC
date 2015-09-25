@@ -24,12 +24,9 @@ int foregroundcmd(char *filename, char *argv[], char *infilename, char *outfilen
   if (pid == 0) { /* child */
     redirect_stdinandout(infilename, outfilename);
     
-  	printf("F: Child replacing process...\n");
   	execvp(filename, argv);
   } else { /* parent */
-  	printf("F: Waiting for child process, hopefully...\n");
   	waitpid(pid, NULL, 0); // Arguments...
-  	printf("F: Done waiting for child.\n");
   }
 }
 
@@ -41,9 +38,8 @@ int backgroundcmd(char *filename, char *argv[], char *infilename, char *outfilen
   if (pid == 0) { /* child */
     redirect_stdinandout(infilename, outfilename);
 
-    printf("B: Child replacing process...\n");
     execvp(filename, argv);
   } else { /* parent */
-    printf("B: Not waiting for child.\n");
+    // Do nothing
   }
 }
