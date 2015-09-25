@@ -55,7 +55,7 @@ int executeshellcmd (Shellcmd *shellcmd)
     // Background vs. Foreground
     if (shellcmd->background == 1) { // Execute command without waiting for finished execution
       if (scndCmd != NULL) { // Perform piping
-        pipecmd(*cmd, cmd, *scndCmd, scndCmd); // Performing pipe with current and next command (with their args)
+        pipecmd(*cmd, cmd, *scndCmd, scndCmd, 1); // Performing pipe with current and next command (with their args) in bg
       }
       else {
         backgroundcmd(*cmd, cmd, rd_stdin, rd_stdout);
@@ -63,7 +63,7 @@ int executeshellcmd (Shellcmd *shellcmd)
     }
     else { // Execute command and wait for it
       if (scndCmd != NULL) { // Perform piping
-        pipecmd(*cmd, cmd, *scndCmd, scndCmd); // Performing pipe with current and next command (with their args)
+        pipecmd(*cmd, cmd, *scndCmd, scndCmd, 0); // Performing pipe with current and next command (with their args) in fg
       }
       else {
         foregroundcmd(*cmd, cmd, rd_stdin, rd_stdout);
