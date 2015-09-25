@@ -43,7 +43,8 @@ int executeshellcmd (Shellcmd *shellcmd)
     cmdlist = cmdlist->next; // Iteration
     char **scndCmd = cmdlist->cmd; // Next command
     printf("%s\n", cmd[0]);
-    printf("%s\n", scndCmd[0]);
+    if (scndCmd != NULL)
+      printf("%s\n", scndCmd[0]);
     // Print Shellcmd
     printshellcmd(shellcmd);
 

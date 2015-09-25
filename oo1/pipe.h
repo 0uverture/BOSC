@@ -8,6 +8,6 @@
 #ifndef _PIPE_H
 #define _PIPE_H
 
-int pipecmd(char *filename, char *argv[], char *filename2, char *argv2[]);
+int pipecmd(char *filename, char *argv[], char *filename2, char *argv2[], int background);
 
 #endif

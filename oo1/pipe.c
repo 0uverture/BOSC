@@ -52,6 +52,8 @@ int pipecmd(char *filename1, char *argv1[], char *filename2, char *argv2[], int 
 		close(fd[1]); // Close write-end of pipe (process finished)
 		exit(status);
 	} else if (pid2 > 0) {
+		close(fd[0]);
+		close(fd[1]);
 		if (!background) {
 			// Wait for processes
 			waitpid(pid1, NULL, 0);
