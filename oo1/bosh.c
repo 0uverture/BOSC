@@ -41,7 +41,9 @@ int executeshellcmd (Shellcmd *shellcmd)
   while (cmdlist != NULL) {
     char **cmd = cmdlist->cmd; // Current command
     cmdlist = cmdlist->next; // Iteration
-    char **scndCmd = cmdlist->cmd; // Next command
+    char **scndCmd;
+    if (cmdlist != NULL)
+      scndCmd = cmdlist->cmd; // Next command
     printf("%s\n", cmd[0]);
     if (scndCmd != NULL)
       printf("%s\n", scndCmd[0]);
