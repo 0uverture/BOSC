@@ -2,7 +2,7 @@ all: bosh
 
 OBJS = parser.o print.o bosh.o redirect.o forback.o pipe.o
 LIBS= -lreadline -ltermcap
-CC = gcc
+CC = gcc -ggdb
 
 bosh: ${OBJS}
 	${CC} -o $@ ${OBJS} ${LIBS}
