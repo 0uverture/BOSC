@@ -26,7 +26,7 @@ int foregroundcmd(char *filename, char *argv[], char *infilename, char *outfilen
     
   	int status = execvp(filename, argv);
     if (status == -1) {
-      printf("We dunno dis command?\n");
+      printf("Command not found.\n");
       exit(1);
     }
   } else { /* parent */
@@ -44,7 +44,7 @@ int backgroundcmd(char *filename, char *argv[], char *infilename, char *outfilen
 
     int status = execvp(filename, argv);
     if (status == -1) {
-      printf("We dunno dis command?\n");
+      printf("Command not found.\n");
       exit(1);
     }
   } else { /* parent */

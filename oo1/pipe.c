@@ -35,7 +35,7 @@ int pipecmd(char *filename1, char *argv1[], char *filename2, char *argv2[], int 
     // Execute process
     int status = execvp(filename1, argv1);
     if (status == -1) {
-      printf("We dunno dis command?\n");
+      printf("Command not found.\n");
       exit(1);
     }
     // Clean up open pipe end
@@ -51,7 +51,7 @@ int pipecmd(char *filename1, char *argv1[], char *filename2, char *argv2[], int 
 		// Execute process
 		int status = execvp(filename2, argv2);
 		if (status == -1) {
-	      printf("We dunno dis command?\n");
+	      printf("Command not found.\n");
 	      exit(1);
 	    }
 		// Clean up open pipe end
