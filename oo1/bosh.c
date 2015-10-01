@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
-#include <unistd.h>
 #include <stdbool.h>
 #include <signal.h>
 #include <readline/readline.h>
@@ -29,7 +28,7 @@ void handler(int dummy)
 }
 
 /* --- use the /proc filesystem to obtain the hostname --- */
-char *gethostname1(char *hostname)
+char *gethostname(char *hostname)
 {
   FILE *file;
   file = fopen("/proc/sys/kernel/hostname", "r");
@@ -100,7 +99,7 @@ int main(int argc, char* argv[]) {
 
   signal(SIGINT, handler); // Listen for Ctrl + C
   
-  if (gethostname1(hostname)) {
+  if (!gethostname(hostname)) {
 
     /* parse commands until exit or ctrl-c */
     while (!terminate) {
