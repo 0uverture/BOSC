@@ -24,9 +24,7 @@
 #define HOSTNAMEMAX 100
 #define COMMANDANDARGSMAX 256
 
-static volatile int keepRunning = 1;
-
-void intHandler(int dummy)
+void handler(int dummy)
 {
 }
 
@@ -71,8 +69,9 @@ int executeshellcmd (Shellcmd *shellcmd)
     if (shellcmd->background == 1) { // Execute command without waiting for finished execution
       if (scndCmd != NULL) { // Perform piping
         pipecmd(*cmd, cmd, *scndCmd, scndCmd, 1); // Performing pipe with current and next command (with their args) in bg
-        if (cmdlist != NULL)
+        if (cmdlist != NULL) {
           cmdlist = cmdlist->next; // Avoid executing 2nd part of pipe (?)
+        }
       }
       else {
         backgroundcmd(*cmd, cmd, rd_stdin, rd_stdout);
@@ -101,7 +100,7 @@ int main(int argc, char* argv[]) {
   int terminate = 0;
   Shellcmd shellcmd;
 
-  signal(SIGINT, intHandler); // Listen for Ctrl + C
+  signal(SIGINT, handler); // Listen for Ctrl + C
   
   if (gethostname1(hostname)) {
 

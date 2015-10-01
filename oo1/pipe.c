@@ -34,7 +34,10 @@ int pipecmd(char *filename1, char *argv1[], char *filename2, char *argv2[], int 
     close(fd[1]); // Close write-end of pipe
     // Execute process
     int status = execvp(filename1, argv1);
-    printf("Status of pid1: %d\n", status);
+    if (status == -1) {
+      printf("We dunno dis command?\n");
+      return -1;
+    }
     // Clean up open pipe end
     close(fd[0]); // Close read-end of pipe (process finished)
     exit(status);
@@ -47,7 +50,10 @@ int pipecmd(char *filename1, char *argv1[], char *filename2, char *argv2[], int 
 		close(fd[0]); // Close read-end of pipe
 		// Execute process
 		int status = execvp(filename2, argv2);
-		printf("Status of pid2: %d\n", status);
+		if (status == -1) {
+	      printf("We dunno dis command?\n");
+	      return -1;
+	    }
 		// Clean up open pipe end
 		close(fd[1]); // Close write-end of pipe (process finished)
 		exit(status);
