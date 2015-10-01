@@ -27,7 +27,7 @@ int foregroundcmd(char *filename, char *argv[], char *infilename, char *outfilen
   	int status = execvp(filename, argv);
     if (status == -1) {
       printf("We dunno dis command?\n");
-      return -1;
+      exit(1);
     }
   } else { /* parent */
   	waitpid(pid, NULL, 0); // Arguments...
@@ -45,7 +45,7 @@ int backgroundcmd(char *filename, char *argv[], char *infilename, char *outfilen
     int status = execvp(filename, argv);
     if (status == -1) {
       printf("We dunno dis command?\n");
-      return -1;
+      exit(1);
     }
   } else { /* parent */
     // Do nothing
