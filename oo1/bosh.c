@@ -34,12 +34,10 @@ void intHandler(int dummy)
 /* --- use the /proc filesystem to obtain the hostname --- */
 char *gethostname1(char *hostname)
 {
-  int res = gethostname(hostname, HOSTNAMEMAX); // From unistd.h
-  if (res != 0) { // Succeeded
-    return hostname;
-  }
-  hostname = "";
-  return hostname;
+  FILE *file;
+  file = fopen("/proc/sys/kernel/hostname", "r");
+  fscanf(file, "%s", hostname);
+  fclose(file);
 }
 
 /* --- execute a shell command --- */
@@ -114,7 +112,7 @@ int main(int argc, char* argv[]) {
   int terminate = 0;
   Shellcmd shellcmd;
   
-  if (gethostname1(hostname)) {
+  if (!gethostname1(hostname)) {
 
     signal(SIGINT, intHandler); // Listen for Ctrl + C
 
