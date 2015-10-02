@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
-#include <sys/time.h>
-#include <pthread.h>
+#include<sys/time.h>
+#include<pthread.h>
 
 typedef struct state {
   int *resource;
@@ -98,12 +98,17 @@ int main(int argc, char* argv[])
   scanf("%d", &n);
 
   /* Allocate memory for state */
-  if (s == NULL) { printf("\nYou need to allocate memory for the state!\n"); exit(0); };
+  State* s = malloc(sizeof(State)); 
+  if (s == NULL) { printf("\nMemory allocation failed for s\n"); exit(0); };
+  s->resource = malloc(n);
+  s->max = malloc(m*n);
+  s->allocation = malloc(m*n);
+  if (s->resource == NULL || s->max == NULL || s->allocation == NULL){ printf("\nMemory allocation failed for one or more of s' arrays.\n"); exit(0); }
 
   /* Get current state as input */
   printf("Resource vector: ");
   for(i = 0; i < n; i++)
-    scanf("%d", &s->resource[i]);
+  	scanf("%d", &s->resource[i]);
   printf("Enter max matrix: ");
   for(i = 0;i < m; i++)
     for(j = 0;j < n; j++)
