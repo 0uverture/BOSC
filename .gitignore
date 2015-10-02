@@ -2,6 +2,8 @@
 !*.*
 !*/
 
+!Makefile
+
 *.o
 *.aux
 *.pdf
