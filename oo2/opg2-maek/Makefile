@@ -1,12 +1,13 @@
+CC = gcc -ggdb
+LIBS= -pthread -lm
+
 all: fifo test
 
-LIBS= -lpthread
+fifo: main.o list.o
+	${CC} -o $@ ${LIBS} list.c main.c
 
-fifo: main.o ${OBJS}
-	gcc -o $@ ${LIBS} list.o main.o
-
-test: test.o
-	gcc -o $@ ${LIBS} test.o;
+test: test.o list.o
+	${CC} -o $@ ${LIBS} list.c test.c;
 
 clean:
 	rm -rf *o fifo
