@@ -2,13 +2,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <math.h>
-
-typedef struct Work {
-	int tid;
-	int start;
-	int end;
-	double result;
-} Work;
+#include "sumsqrt.h"
 
 void *worker(void *data) {
 	Work *work = (Work *) data;
@@ -32,7 +26,7 @@ void *worker(void *data) {
 	pthread_exit(NULL);
 }
 
-double sumsqrt(int n, int tnum) {
+double sum_sqrt(int n, int tnum) {
 	int i;
 	double sum = 0;
 	
@@ -76,9 +70,9 @@ int main(int argc, char* argv[]) {
 		n < 1 ||
 		tnum < 1) {
 		printf("Invalid arguments\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	printf("Summing for %d using %d thread(s)\n", n, tnum);
-	printf("Result: %f\n", sumsqrt(n, tnum));
+	printf("Result: %f\n", sum_sqrt(n, tnum));
 }
