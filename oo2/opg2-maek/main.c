@@ -20,6 +20,13 @@ int main(int argc, char* argv[])
   list_add(fifo, node_new_str("s1"));
   list_add(fifo, node_new_str("s2"));
 
+  list_remove(fifo);
+  list_remove(fifo);
+  list_remove(fifo);
+  
+  list_add(fifo, node_new_str("s1"));
+  list_add(fifo, node_new_str("s2"));
+
   Node *n1 = list_remove(fifo);
   if (n1 == NULL) { printf("Error no elements in list\n"); exit(-1);}
   Node *n2 = list_remove(fifo);

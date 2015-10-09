@@ -2,7 +2,13 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <math.h>
-#include "sumsqrt.h"
+
+typedef struct work {
+	int tid;
+	int start;
+	int end;
+	double result;
+} Work;
 
 void *worker(void *data) {
 	Work *work = (Work *) data;
@@ -31,15 +37,14 @@ double sum_sqrt(int n, int tnum) {
 	double sum = 0;
 	
 	// Array of thread ids
-	pthread_t *tids = malloc(tnum * sizeof(pthread_t));
+	pthread_t tids[tnum];
 
 	// Array of work structs
-	Work *works = malloc(tnum * sizeof(Work));
+	Work works[tnum];
 
 	i = -1;
 	while (++i < tnum) {
 		// Setup work data struct for thread
-		works[i] = * (Work *) malloc(sizeof(Work));
 		works[i].tid = i;
 		works[i].start = n/tnum*i+1;
 		works[i].end = i + 1 == tnum ? n : n/tnum*(i+1);
@@ -52,9 +57,6 @@ double sum_sqrt(int n, int tnum) {
 		pthread_join(tids[i], NULL);
 		sum += works[i].result;
 	}
-
-	free(tids);
-	free(works);
 
 	return sum;
 }
