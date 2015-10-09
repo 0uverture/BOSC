@@ -1,5 +1,5 @@
 CC = gcc -ggdb
-LIBS= -pthread -lm
+LIBS= -pthread 
 
 all: fifo test
 
@@ -10,4 +10,4 @@ test: test.o list.o
 	${CC} -o $@ ${LIBS} list.c test.c;
 
 clean:
-	rm -rf *o fifo
+	rm -rf *o fifo test

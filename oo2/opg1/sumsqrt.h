@@ -8,8 +8,6 @@ typedef struct work {
 	double result;
 } Work;
 
-void *worker(void *data);
 double sum_sqrt(int n, int tnum);
-int main(int argc, char* argv[]);
 
 #endif
