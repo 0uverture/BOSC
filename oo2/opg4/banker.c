@@ -30,12 +30,28 @@ void Sleep(float wait_time_ms)
    results in a safe state and return 1, else return 0 */
 int resource_request(int i, int *request)
 {
-  return 0;
+	int j;
+	for (j = 0; j < n; ++j)
+	{
+		if(request[j] > s->available[j]){ return 0; }
+	}
+
+	for (j = 0; j < n; ++j)
+	{
+		s->available[j] - request[j];
+	}
+
+ 	return 1;
 }
 
 /* Release the resources in request for process i */
 void resource_release(int i, int *request)
 {
+	int j;
+	for (j = 0; j < n; ++j)
+	{
+		s->available[j] =+ request[j];
+	}
 }
 
 /* Generate a request vector */
@@ -64,6 +80,18 @@ void generate_release(int i, int *request)
   printf("Process %d: Releasing resources.\n",i);
 }
 
+int nested_array_malloc(int n, int m, int** *arr)
+{
+	*arr = malloc(m * sizeof(int *));
+	if (*arr == NULL){ printf("Allocation failed."); return 0;}
+	int k;
+	for(k = 0; k < m; k++){
+		(*arr)[k] = malloc(n * sizeof(int));
+		if ((*arr)[k] == NULL){ printf("Allocation failed."); return 0;}
+	}
+	return 1;
+}
+
 /* Threads starts here */
 void *process_thread(void *param)
 {
@@ -71,6 +99,8 @@ void *process_thread(void *param)
   int i = (int) (long) param, j;
   /* Allocate request vector */
   int *request = malloc(n*sizeof(int));
+  if (request == NULL) {printf("\nMemory allocation failed for s\n"); return(0); }
+
   while (1) {
     /* Generate request */
     generate_request(i, request);
@@ -100,10 +130,16 @@ int main(int argc, char* argv[])
   /* Allocate memory for state */
   State* s = malloc(sizeof(State)); 
   if (s == NULL) { printf("\nMemory allocation failed for s\n"); exit(0); };
-  s->resource = malloc(n);
-  s->max = malloc(m*n);
-  s->allocation = malloc(m*n);
-  if (s->resource == NULL || s->max == NULL || s->allocation == NULL){ printf("\nMemory allocation failed for one or more of s' arrays.\n"); exit(0); }
+  
+  s->resource = (int*) malloc(n*sizeof(int));
+  if (s->resource == NULL){ printf("\nMemory allocation failed."); exit(0); };
+
+  s->available = (int*) malloc(n*sizeof(int));
+  if (s->available == NULL){ printf("\nMemory allocation failed."); exit(0); };
+
+  nested_array_malloc(n, m, &s->max);
+  nested_array_malloc(n, m, &s->allocation);
+  nested_array_malloc(n, m, &s->need);
 
   /* Get current state as input */
   printf("Resource vector: ");
@@ -123,7 +159,7 @@ int main(int argc, char* argv[])
   /* Calcuate the need matrix */
   for(i = 0; i < m; i++)
     for(j = 0; j < n; j++)
-      s->need[i][j] = s->max[i][j]-s->allocation[i][j];
+      s->need[i][j] = s->max[i][j] - s->allocation[i][j];
 
   /* Calcuate the availability vector */
   for(j = 0; j < n; j++) {
@@ -152,6 +188,7 @@ int main(int argc, char* argv[])
   printf("\n");
 
   /* If initial state is unsafe then terminate with error */
+
 
   /* Seed the random number generator */
   struct timeval tv;
