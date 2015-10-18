@@ -1,10 +1,9 @@
-all: fifo
+CC = gcc -ggdb
+OBJS = producerconsumer.o list.o
+LIBS = -pthread
 
-OBJS = list.o producerconsumer.o
-LIBS= -lpthread
-
-fifo: producerconsumer.o ${OBJS}
-	gcc -o $@  ${LIBS} ${OBJS}
+fifo: ${OBJS}
+	${CC} -o $@ ${OBJS} ${LIBS}
 
 clean:
-	rm -rf *o fifo
+	rm -rf *.o fifo

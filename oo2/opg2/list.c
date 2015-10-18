@@ -11,9 +11,7 @@
 #include <pthread.h>
 #include "list.h"
 
-pthread_mutex_t mutexlength;
-pthread_mutex_t mutexfirstnext;
-pthread_mutex_t mutexlast;
+pthread_mutex_t mutex;
 
 /* list_new: return a new list structure */
 List *list_new(void)
@@ -33,33 +31,28 @@ List *list_new(void)
 /* list_add: add node n to list l as the last element */
 void list_add(List *l, Node *n)
 {
+  pthread_mutex_lock(&mutex);
   int length = l->len; // Retrieve length
+
   if (length > 0) // Already contains one or more elements
   {
-    pthread_mutex_lock(&mutexlast);
     // Link to next (new) node
     l->last->next = n; // Make previously last element link to new last element ("next")
-    pthread_mutex_unlock(&mutexlast);
   }
   else // Is empty
   {
-    pthread_mutex_lock(&mutexfirstnext);
     l->first->next = n; // Set first Node to given Node
-    pthread_mutex_unlock(&mutexfirstnext);
   }
 
-  pthread_mutex_lock(&mutexlast);
   l->last = n; // Define as last element
-  pthread_mutex_unlock(&mutexlast);
-
-  pthread_mutex_lock(&mutexlength);
   l->len++; // Update length regardless
-  pthread_mutex_unlock(&mutexlength);
+  pthread_mutex_unlock(&mutex);
 }
 
 /* list_remove: remove and return the first (non-root) element from list l */
 Node *list_remove(List *l)
 {
+  pthread_mutex_lock(&mutex);
   int length = l->len; // Retrieve length
   if (length > 0) // Contains one or more elements
   {
@@ -67,28 +60,27 @@ Node *list_remove(List *l)
     Node *newFirst = removed->next; // Get new first Node
     if (newFirst == NULL) // List is being emptied
     {
-      pthread_mutex_lock(&mutexfirstnext);
-      l->first->next = l->last = NULL;
-      pthread_mutex_unlock(&mutexfirstnext);
+      l->first->next = NULL;
+      l->last = NULL;
     }
     else { // Two or more elements
-      pthread_mutex_lock(&mutexfirstnext);
       l->first->next = newFirst; // Overwrite "first->next" (First Node apart from header-Node) to be the next element in FIFO list
-      pthread_mutex_unlock(&mutexfirstnext);
     }
-    
+
     // One element removed regardless
-    pthread_mutex_lock(&mutexlength);
     l->len--;
-    pthread_mutex_unlock(&mutexlength);
+
+    pthread_mutex_unlock(&mutex);
 
     // List no longer holds any connection to previously first element, return:
     return removed;
   }
   else // List is empty
   {
+    pthread_mutex_unlock(&mutex);
     return NULL;
   }
+    
 }
 
 /* node_new: return a new node structure */
