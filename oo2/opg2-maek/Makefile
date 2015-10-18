@@ -1,5 +1,5 @@
 CC = gcc -ggdb
-LIBS= -pthread 
+LIBS = -pthread 
 
 all: fifo test
 

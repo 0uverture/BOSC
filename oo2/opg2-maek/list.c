@@ -11,8 +11,7 @@
 #include <pthread.h>
 #include "list.h"
 
-pthread_mutex_t mutexlength;
-pthread_mutex_t mutexelement;
+pthread_mutex_t mutex;
 
 /* list_new: return a new list structure */
 List *list_new(void)
@@ -32,36 +31,28 @@ List *list_new(void)
 /* list_add: add node n to list l as the last element */
 void list_add(List *l, Node *n)
 {
-  pthread_mutex_lock(&mutexlength);
+  pthread_mutex_lock(&mutex);
   int length = l->len; // Retrieve length
 
   if (length > 0) // Already contains one or more elements
   {
-    pthread_mutex_unlock(&mutexlength);
-
-    pthread_mutex_lock(&mutexelement);
     // Link to next (new) node
     l->last->next = n; // Make previously last element link to new last element ("next")
   }
   else // Is empty
   {
-    pthread_mutex_unlock(&mutexlength);
-
-    pthread_mutex_lock(&mutexelement);
     l->first->next = n; // Set first Node to given Node
   }
 
   l->last = n; // Define as last element
-  pthread_mutex_unlock(&mutexelement);
-
-  pthread_mutex_lock(&mutexlength);
   l->len++; // Update length regardless
-  pthread_mutex_unlock(&mutexlength);
+  pthread_mutex_unlock(&mutex);
 }
 
 /* list_remove: remove and return the first (non-root) element from list l */
 Node *list_remove(List *l)
 {
+  pthread_mutex_lock(&mutex);
   int length = l->len; // Retrieve length
   if (length > 0) // Contains one or more elements
   {
@@ -69,22 +60,27 @@ Node *list_remove(List *l)
     Node *newFirst = removed->next; // Get new first Node
     if (newFirst == NULL) // List is being emptied
     {
-      l->first->next = l->last = NULL;
+      l->first->next = NULL;
+      l->last = NULL;
     }
     else { // Two or more elements
       l->first->next = newFirst; // Overwrite "first->next" (First Node apart from header-Node) to be the next element in FIFO list
     }
-    
+
     // One element removed regardless
     l->len--;
+
+    pthread_mutex_unlock(&mutex);
 
     // List no longer holds any connection to previously first element, return:
     return removed;
   }
   else // List is empty
   {
+    pthread_mutex_unlock(&mutex);
     return NULL;
   }
+    
 }
 
 /* node_new: return a new node structure */
