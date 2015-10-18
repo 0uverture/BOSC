@@ -10,13 +10,13 @@ int PRODUCTIONS_PER_PRODUCER = 5;
 int CONSUMPTIONS_PER_CONSUMER = 5;
 
 // Semaphores
-sem_t mutex;
+sem_t pcmutex;
 sem_t empty;
 sem_t full;
 
 // Item ID with mutex
 pthread_mutex_t mutexItemId;
-int ITEM_ID;
+int ITEM_ID = 0;
 
 // FIFO list
 List *fifo;
@@ -31,19 +31,17 @@ void *produce(void *data)
 		/* Produce the ith item */
 		sem_wait(&empty);
 		printf("P: After wait4empty\n");
-		sem_wait(&mutex);
+		sem_wait(&pcmutex);
 		printf("P: After wait4mutex\n");
 			// Generate item name
-			pthread_mutex_lock(&mutexItemId); // Necessary? - Already have "mutex", which should block parallel productions
 			char *itemName;
 			sprintf(itemName, "Item_%d", ITEM_ID++);
-			pthread_mutex_unlock(&mutexItemId);
 			// Produce the item
 			list_add(fifo, node_new_str(itemName));
 			// Print
 			printf("Producer %d produced %s. Items in buffer: %d (Out of %d)\n",
 				*producerId, itemName, fifo->len, BUFFER_SIZE);
-		sem_post(&mutex);
+		sem_post(&pcmutex);
 		sem_post(&full);
 		Sleep(1000); // Sleep for 1 second on average
 	}
@@ -58,7 +56,7 @@ void *consume(void *data)
 		printf("C: Start of forloop\n");
 		sem_wait(&full);
 		printf("C: After wait4full\n");
-		sem_wait(&mutex);
+		sem_wait(&pcmutex);
 		printf("C: After wait4mutex\n");
 			// Consume the item
 			char *itemName;
@@ -66,7 +64,7 @@ void *consume(void *data)
 			// Print
 			printf("Consumer %d consumed %s. Items in buffer: %d (Out of %d)\n",
 				*consumerId, itemName, fifo->len, BUFFER_SIZE);
-		sem_post(&mutex);
+		sem_post(&pcmutex);
 		sem_post(&empty);
 		Sleep(1000); // Sleep for 1 second on average
 	}
@@ -85,16 +83,17 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	// Initialize list and semaphores
-	fifo = list_new();
-	sem_init(&mutex, 0, 1);
-	sem_init(&empty, 0, BUFFER_SIZE);
-	sem_init(&full, 0, 0);
-
 	// Retrieve arguments
 	int producerAmount = atoi(argv[1]);
 	int consumerAmount = atoi(argv[2]);
 	BUFFER_SIZE = atoi(argv[3]);
+
+	// Initialize list and semaphores
+	fifo = list_new();
+	list_add(fifo, node_new_str("lala"));
+	sem_init(&pcmutex, 0, 1);
+	sem_init(&empty, 0, BUFFER_SIZE);
+	sem_init(&full, 0, 0);
 
 	printf("Program start: %d producers, %d consumers and a buffer size of %d...\n",
 		producerAmount, consumerAmount, BUFFER_SIZE);
@@ -109,12 +108,14 @@ int main(int argc, char *argv[])
 	{
 		if (i < producerAmount) {
 			// Spawn producer thread
-			pthread_create(&producer_ids[i], NULL, produce, (void *) &i);
+			int id = i;
+			pthread_create(&producer_ids[i], NULL, produce, (void *) &id);
 			i++;
 		}
 		if (j < consumerAmount) {
 			// Spawn consumer thread
-			pthread_create(&consumer_ids[j], NULL, consume, (void *) &j);
+			int id = j;
+			pthread_create(&consumer_ids[j], NULL, consume, (void *) &id);
 			j++;
 		}
 	}
@@ -145,7 +146,6 @@ int main(int argc, char *argv[])
 /* Random sleep function */
 void Sleep(float wait_time_ms)
 {
-	/*
 	// seed the random number generator
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
@@ -153,5 +153,4 @@ void Sleep(float wait_time_ms)
 
 	wait_time_ms = ((float)rand())*wait_time_ms / (float)RAND_MAX;
 	usleep((int) (wait_time_ms * 1e3f)); // convert from ms to us
-	*/
 }
