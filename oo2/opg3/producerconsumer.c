@@ -1,8 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <pthread.h>
 #include <semaphore.h>
-#include <sys/time.h>
+#include <sys/times.h>
 #include "list.h"
 
 int PRODUCTIONS_PER_PRODUCER = 5;
@@ -26,9 +27,12 @@ void *produce(void *data)
 	int *producerId = (int *) data;
 	int i;
 	for (i = 0; i < PRODUCTIONS_PER_PRODUCER; i++) {
+		printf("P: Start of forloop\n");
 		/* Produce the ith item */
 		sem_wait(&empty);
+		printf("P: After wait4empty\n");
 		sem_wait(&mutex);
+		printf("P: After wait4mutex\n");
 			// Generate item name
 			pthread_mutex_lock(&mutexItemId); // Necessary? - Already have "mutex", which should block parallel productions
 			char *itemName;
@@ -43,15 +47,19 @@ void *produce(void *data)
 		sem_post(&full);
 		Sleep(1000); // Sleep for 1 second on average
 	}
+	return;
 }
 
-void consume(void *data)
+void *consume(void *data)
 {
 	int *consumerId = (int *) data;
 	int i;
 	for (i = 0; i < CONSUMPTIONS_PER_CONSUMER; i++) {
+		printf("C: Start of forloop\n");
 		sem_wait(&full);
+		printf("C: After wait4full\n");
 		sem_wait(&mutex);
+		printf("C: After wait4mutex\n");
 			// Consume the item
 			char *itemName;
 			itemName = (char *) list_remove(fifo)->elm; // Get element, expect string (void pointer)
@@ -62,17 +70,18 @@ void consume(void *data)
 		sem_post(&empty);
 		Sleep(1000); // Sleep for 1 second on average
 	}
+	return;
 }
 
 int main(int argc, char *argv[])
 {
 	// Validate arguments
 	if (argc < 4 || 
-		!atoi (argv[1]) < 1 || // 0 if unsuccessful parse or negative or 0 if otherwise invalid :)
-		!atoi (argv[2]) < 1 ||
-		!atoi (argv[3]) < 1) {
+		atoi (argv[1]) < 1 || // 0 if unsuccessful parse or negative or 0 if otherwise invalid :)
+		atoi (argv[2]) < 1 ||
+		atoi (argv[3]) < 1) {
 
-		printf("Invalid arguments. Please provide positive integers.\n");
+		printf("Invalid arguments. Please provide three positive integers.\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -96,31 +105,38 @@ int main(int argc, char *argv[])
 
 	// Attempt to spawn producers and consumers somewhat at the same time
 	int i = 0, j = 0;
-	while (i++ < producerAmount || j++ < consumerAmount) // A producer or a consumer can be spawned
+	while (i < producerAmount || j < consumerAmount) // A producer or a consumer can be spawned
 	{
 		if (i < producerAmount) {
 			// Spawn producer thread
-			pthread_create(&producer_ids[i], NULL, produce, (void *) &producer_ids[i]);
+			pthread_create(&producer_ids[i], NULL, produce, (void *) &i);
+			i++;
 		}
 		if (j < consumerAmount) {
 			// Spawn consumer thread
-			pthread_create(&consumer_ids[j], NULL, consume, (void *) &consumer_ids[j]);
+			pthread_create(&consumer_ids[j], NULL, consume, (void *) &j);
+			j++;
 		}
 	}
+	printf("Finished spawning threads.\n");
 
 	// Join threads
 	i = 0; j = 0;
-	while (i++ < producerAmount || j++ < consumerAmount) // A producer or a consumer can be spawned
+	while (i < producerAmount || j < consumerAmount) // A producer or a consumer can be spawned
 	{
+		printf("Trying to wait for thread\n");
 		if (i < producerAmount) {
-			// Spawn producer thread
+			// Join producer thread
 			pthread_join(producer_ids[i], NULL);
+			i++;
 		}
 		if (j < consumerAmount) {
-			// Spawn consumer thread
+			// Join consumer thread
 			pthread_join(consumer_ids[j], NULL);
+			j++;
 		}
 	}
+	printf("Finished joining threads.\n");
 
 	free(producer_ids);
 	free(consumer_ids);
