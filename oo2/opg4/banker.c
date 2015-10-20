@@ -1,7 +1,7 @@
 #include<string.h>
 #include<stdio.h>
 #include<stdlib.h>
-#include<sys/time.h>
+#include<time.h>
 #include<pthread.h>
 
 typedef struct state {
@@ -36,6 +36,10 @@ void print_available(){
 	}
 	printf("\n");
 }
+/*Returns a pseudo-random integer between 0 and given limit.*/
+int random_number(int lim){
+	return lim * (((double)rand() / (double)RAND_MAX) + 0.5 );
+}
 
 /* Allocate resources in request for process i, only if it 
    results in a safe state and return 1, else return 0 */
@@ -57,6 +61,11 @@ int resource_request(int i, int *request)
 	}
 	printf("Request approved.\n");
 	print_available();
+ 	
+	request[0] = 0;
+	request[1] = 0;
+	request[2] = 0;
+
  	return 1;
 }
 
@@ -67,26 +76,35 @@ void resource_release(int i, int *request)
 	for (j = 0; j < n; ++j)
 	{
 		s->available[j] += request[j];
+		s->need[i][j] += request[j];
+		s->allocation[i][j] -= request[j];
 	}
+	printf("Resources released by process %d\n", i);
 	print_available();
 }
 
 /* Generate a request vector */
 void generate_request(int i, int *request)
 {
-  int j;
-    for (j = 0;j < n; j++) {
-      request[j] = s->need[i][j] * ((double)rand())/ (double)RAND_MAX;
-    }
+  	int j;
+  	while(is_empty(request)){
+    	for (j = 0;j < n; j++) {
+    		printf("S need is %d\n", s->need[i][j]);
+      		request[j] = random_number(s->need[i][j]);
+    	}
+	}
 }
 
 /* Generate a release vector */
 void generate_release(int i, int *request)
 {
   int j;
-    for (j = 0;j < n; j++) {
-      request[j] = s->allocation[i][j] * ((double)rand())/ (double)RAND_MAX;
-    }
+  	while(is_empty(request)){
+    	for (j = 0;j < n; j++) {
+      		request[j] = random_number(s->allocation[i][j]);
+    	}
+	}
+	printf("Releasing resources %d %d %d\n", request[0], request[1], request[2]);
 }
 
 int nested_array_malloc(int n, int m, int** *arr)
@@ -163,7 +181,7 @@ void *process_thread(void *param)
     /* Release resources */
     resource_release(i, request);
     /* Wait */
-    printf("Big sleep.\n");
+    printf("Big sleep for process %d.\n", i);
     Sleep(1000);
   }
   free(request);
@@ -171,6 +189,23 @@ void *process_thread(void *param)
 
 int main(int argc, char* argv[])
 {
+//Rand test
+/*	int swag, zero = 0, one = 0, two = 0, wtf;
+	for (swag = 0; swag < 1000; ++swag)
+	{
+		wtf = random_number(1);
+		printf("Wtf is %d\n", wtf);
+		if(wtf){
+			one++;
+		}
+		else {
+			zero++;
+		}
+	}
+	printf("Ones: %d Zeroes: %d\n", one, zero);
+	exit(0);*/
+
+
   /* Get size of current state as input */
   int i, j;
   printf("Number of processes: ");
@@ -268,7 +303,9 @@ int main(int argc, char* argv[])
   struct timeval tv;
   gettimeofday(&tv, NULL);
   srand(tv.tv_usec);
-  
+
+  //srand(time(NULL));
+
   /* Create m threads */
   pthread_t *tid = malloc(m*sizeof(pthread_t));
   for (i = 0; i < 1; i++)
