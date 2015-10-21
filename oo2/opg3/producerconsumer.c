@@ -39,12 +39,9 @@ void *produce(void *data)
 	int *producerId = (int *) data;
 	int i;
 	for (i = 0; i < PRODUCTIONS_PER_PRODUCER; i++) {
-		printf("P: Start of forloop\n");
 		/* Produce the ith item */
 		sem_wait(&empty);
-		printf("P: After wait4empty\n");
 		pthread_mutex_lock(&pcmutex);
-		printf("P: After wait4mutex\n");
 			// Generate item name
 			// 5 chars in "Item_"
 			char itemName[5 + 1 + ITEM_ID/10];
@@ -68,11 +65,8 @@ void *consume(void *data)
 	int *consumerId = (int *) data;
 	int i;
 	for (i = 0; i < CONSUMPTIONS_PER_CONSUMER; i++) {
-		printf("C: Start of forloop\n");
 		sem_wait(&full);
-		printf("C: After wait4full\n");
 		pthread_mutex_lock(&pcmutex);
-		printf("C: After wait4mutex\n");
 			// Consume the item
 			char *itemName;
 			itemName = (char *) list_remove(fifo)->elm; // Get element, expect string (void pointer)
@@ -124,16 +118,18 @@ int main(int argc, char *argv[])
 	{
 		if (i < producerAmount) {
 			// Spawn producer thread
-			int id = i;
-			pthread_create(&producer_ids[i], NULL, produce, (void *) &id);
+			int *id = malloc(sizeof(int));
+			*id = i;
+			pthread_create(&producer_ids[i], NULL, produce, (void *) id);
 			i++;
 		}
-		/*if (j < consumerAmount) {
+		if (j < consumerAmount) {
 			// Spawn consumer thread
-			int id = j;
-			pthread_create(&consumer_ids[j], NULL, consume, (void *) &id);
+			int *id2 = malloc(sizeof(int));
+			*id2 = j;
+			pthread_create(&consumer_ids[j], NULL, consume, (void *) id2);
 			j++;
-		}*/
+		}
 	}
 	printf("Finished spawning threads.\n");
 
@@ -141,17 +137,16 @@ int main(int argc, char *argv[])
 	i = 0; j = 0;
 	while (i < producerAmount || j < consumerAmount) // A producer or a consumer can be spawned
 	{
-		printf("Trying to wait for thread\n");
 		if (i < producerAmount) {
 			// Join producer thread
 			pthread_join(producer_ids[i], NULL);
 			i++;
 		}
-		/*if (j < consumerAmount) {
+		if (j < consumerAmount) {
 			// Join consumer thread
 			pthread_join(consumer_ids[j], NULL);
 			j++;
-		}*/
+		}
 	}
 	printf("Finished joining threads.\n");
 
