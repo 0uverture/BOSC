@@ -22,6 +22,18 @@ int ITEM_ID = 0;
 List *fifo;
 int BUFFER_SIZE; // FIFO list max size @ production/consumption
 
+/* Random sleep function */
+void sleep(float wait_time_ms)
+{
+	// seed the random number generator
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	srand(tv.tv_usec);
+
+	wait_time_ms = ((float)rand())*wait_time_ms / (float)RAND_MAX;
+	usleep((int) (wait_time_ms * 1e3f)); // convert from ms to us
+}
+
 void *produce(void *data)
 {
 	int *producerId = (int *) data;
@@ -34,7 +46,8 @@ void *produce(void *data)
 		pthread_mutex_lock(&pcmutex);
 		printf("P: After wait4mutex\n");
 			// Generate item name
-			char *itemName;
+			// 5 chars in "Item_"
+			char itemName[5 + 1 + ITEM_ID/10];
 			pthread_mutex_lock(&mutexItemId);
 			sprintf(itemName, "Item_%d", ITEM_ID++);
 			pthread_mutex_unlock(&mutexItemId);
@@ -45,7 +58,7 @@ void *produce(void *data)
 				*producerId, itemName, fifo->len, BUFFER_SIZE);
 		pthread_mutex_unlock(&pcmutex);
 		sem_post(&full);
-		Sleep(1000); // Sleep for 1 second on average
+		sleep(1000); // Sleep for 1 second on average
 	}
 	return;
 }
@@ -68,7 +81,7 @@ void *consume(void *data)
 				*consumerId, itemName, fifo->len, BUFFER_SIZE);
 		pthread_mutex_unlock(&pcmutex);
 		sem_post(&empty);
-		Sleep(1000); // Sleep for 1 second on average
+		sleep((float)1000); // Sleep for 1 second on average
 	}
 	return;
 }
@@ -144,16 +157,4 @@ int main(int argc, char *argv[])
 
 	free(producer_ids);
 	free(consumer_ids);
-}
-
-/* Random sleep function */
-void Sleep(float wait_time_ms)
-{
-	// seed the random number generator
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	srand(tv.tv_usec);
-
-	wait_time_ms = ((float)rand())*wait_time_ms / (float)RAND_MAX;
-	usleep((int) (wait_time_ms * 1e3f)); // convert from ms to us
 }
