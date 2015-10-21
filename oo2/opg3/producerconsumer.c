@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
 	printf("Finished joining threads.\n");
 
 	free(producer_ids);
-	//free(consumer_ids);
+	free(consumer_ids);
 }
 
 /* Random sleep function */
