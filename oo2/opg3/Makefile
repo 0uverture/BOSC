@@ -1,4 +1,4 @@
-CC = gcc -ggdb
+CC = gcc -ggdb -g -O0
 OBJS = producerconsumer.o list.o
 LIBS = -pthread
 
