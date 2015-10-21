@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <stdbool.h>
 #include "minunit.h"
 #include "list.h"
 
@@ -13,124 +14,164 @@
 /**
  * Amount of operations perfomed by each thread in each test function.
  */
-#define ACT_COUNT 1000
-
+#define ACT_COUNT 10000
 
 int tests_run = 0;
 
-static void act_list_remove(List *list, int *result, int count) {
-  int i;
 
-  // Pop all nodes, and register their value.
-  i = -1;
-  while (++i < count) {
-    int value = (intptr_t) list_remove(list)->elm;
-    result[value]++;
-  }
-}
+/*
+ * STRUCTS
+ */
 
 /**
- * Act function for removing all elements from a list.
- * Amount of elements removed is determined by list.len.
- *
- * WARNING:
- * This function does not ensure that the list is empty.
- * See assert_list_empty function for this purpose.
+ * Struct describing task for worker_remove function.
  */
-static void act_list_remove_all(List *list, int *result) {
-  act_list_remove(list, result, list->len);
-}
+typedef struct remove_work {
+  List *list;
+  int *freq;
+} Remove_Work;
 
-static void act_list_add_all(List *list) {
-  int i = -1, j;
-  while (++i < THREAD_NUM) {
-    j = -1;
-    while (++j < ACT_COUNT) {
-      Node *node = node_new();
-      node->elm = (void *) (intptr_t) j;
-      list_add(list, node);
+
+/*
+ * UTILITY FUNCTIONS
+ */
+
+/**
+ * Removes n nodes from given list and saves the frequency
+ * of node values in given freq array.
+ * If list_remove return NULL, the function continues without
+ * incrementing any frequency value.
+ */
+static void remove_n(List *list, int *freq, int n) {
+  int i;
+  for (i = 0; i < n; ++i) {
+    Node *node = list_remove(list);
+    if (node) {
+      int *value = node->elm;
+      freq[*value]++;
+      free(value);
     }
   }
 }
 
+
+/**
+ * Accumulates the frequency arrays of n Remove_Work structs
+ * in given work_arr array, storing the final frequency result in freq_result.
+ */
+static void freq_remove_work(Remove_Work *work_arr, int *freq_result, int n) {
+  int i, j;
+
+  for (i = 0; i < n; ++i)
+  {
+    for (j = 0; j < ACT_COUNT; ++j)
+    {
+      freq_result[j] += work_arr[i].freq[j];
+    }
+  }
+}
+
+
+/*
+ * ASSERTION FUNCTIONS
+ */
+
 /**
  * Assertion function for executing given routine on one or more threads.
+ * All threads are supplied the given data argument.
  * Amount of threads is determined by THREAD_NUM.
  * Assertion fails if pthread_create or pthread_join fails at any point.
  */
-static char *assert_work(List *list, void *(*start_routine) (void *)) {
+static bool assert_work(void *data, void *(*start_routine) (void *)) {
   pthread_t tid[THREAD_NUM];
   int i;
 
-  // Create worker threads
-  i = -1;
-  while (++i < THREAD_NUM) {
-    mu_assert(
-      "Thread creation failed",
-      0 == pthread_create(&tid[i], NULL, start_routine, (void *) list));
+  // Create threads
+  for (i = 0; i < THREAD_NUM; ++i) {
+    if(0 != pthread_create(&tid[i], NULL, start_routine, data))
+      return false;
   }
 
-  // Join worker threads
-  i = -1;
-  while (++i < THREAD_NUM) {
-    mu_assert(
-      "Thread join failed",
-      0 == pthread_join(tid[i], NULL));
+  // Join threads
+  for (i = 0; i < THREAD_NUM; ++i) {
+    if(0 != pthread_join(tid[i], NULL))
+      return false;
   }
 
-  return 0;
+  return true;
 }
 
 /**
- * Asserts thats list.len is equal to the maximum possible length.
- * This criteria is based on THREAD_NUM and ACT_COUNT.
+ * Assertion function for executing given routine on one or more threads.
+ * Threads are supplied with individual elements from the given data_arr array.
+ * Amount of threads is determined by THREAD_NUM.
+ * Assertion fails if pthread_create or pthread_join fails at any point.
  */
-static char *assert_list_length_max(List *list) {
-  mu_assert(
-      "Invalid list length",
-      THREAD_NUM * ACT_COUNT == list->len);
-  return 0;
-}
+static bool assert_work_arr(void *data_arr, int ele_size, void *(*start_routine) (void *)) {
+  pthread_t tid[THREAD_NUM];
+  int i;
 
-static char *assert_list_length_min(List *list) {
-  mu_assert(
-    "List.len is not 0",
-    0 == list->len);
-  return 0;
+  // Create threads
+  for (i = 0; i < THREAD_NUM; ++i) {
+    void *ele = data_arr + i * ele_size;
+    if(0 != pthread_create(&tid[i], NULL, start_routine, ele))
+      return false;
+  }
+
+  // Join threads
+  for (i = 0; i < THREAD_NUM; ++i) {
+    if(0 != pthread_join(tid[i], NULL))
+      return false;
+  }
+
+  return true;
 }
 
 /**
- * Asserts that the list is empty based on list_remove.
+ * Asserts that the list is empty.
+ * An empty list must have a length of 0 and list_remove
+ * must return NULL.
  */
-static char *assert_list_empty(List *list) {
-  mu_assert(
-    "List not empty",
-    list_remove(list) == NULL);
-   return 0;
+static bool assert_empty(List *list) {
+  return list->len == 0 && list_remove(list) == NULL;
 }
 
 /**
  * Asserts that all node values are accounted for,
  * and that no nodes were duplicated.
- * The length of the result list should be equal to the
- * maximum node.elm value in list.
+ * For this to be true, all values in frequency array
+ * should be equal to THREAD_NUM, as each thread uses
+ * any value exactly once.
  */
-static char *assert_list_integrity(int *result) {
-  int i = -1;
-  while (++i < ACT_COUNT) {
-    mu_assert(
-      "Missing/duplicated node detected",
-      result[i] == THREAD_NUM);
+static bool assert_freq(int *freq, int target) {
+  int i;
+  for (i = 0; i < ACT_COUNT; ++i) {
+    if (freq[i] != target)
+      return false;
   }
+  return true;
 }
 
+
+/*
+ * THREAD WORKER FUNCTIONS
+ */
+
+/**
+ * Worker function for adding ACT_COUNT amount of nodes
+ * to a list, given by the data argument, on a seperate thread.
+ * The nodes will hold int pointers to integers from 0 to ACT_COUNT-1.
+ */
 static void *worker_add(void *data) {
   List *list = data;
+  int i;
 
-  int i = -1;
-  while (++i < ACT_COUNT) {
+  for (i = 0; i < ACT_COUNT; ++i) {
+    int *value = malloc(sizeof(int));
+    *value = i;
+
     Node *node = node_new();
-    node->elm = (void *) (intptr_t) i;
+    node->elm = value;
 
     list_add(list, node);
   }
@@ -138,191 +179,223 @@ static void *worker_add(void *data) {
   pthread_exit(NULL);
 }
 
-static char *test_add() {
-  List *list = list_new();
-
-  // List for storing node data.
-  int result[ACT_COUNT];
-
-  // Zero out list
-  int i = -1;
-  while (++i < ACT_COUNT) {
-    result[i] = 0;
-  }
-  
-  // Do adding work on threads and assert successful thread creation and joining.
-  assert_work(list, worker_add);
-
-  // Assert that all thread pushes are accounted for in list.len member.
-  assert_list_length_max(list);
-
-  // Initialize array for storing data from all pushed nodes.
-  act_list_remove_all(list, result);
-
-  // Assert that all nodes have been popped.
-  assert_list_empty(list);
-
-  // Assert that no nodes are missing or duplicated.
-  assert_list_integrity(result);
-
-  return 0;
-}
-
-typedef struct remove_work {
-  List *list;
-  int *result;
-} Remove_Work;
-
+/**
+ * Worker function for removing ACT_COUNT amount of nodes
+ * from list.
+ * The frequency of integer values contained in the nodes
+ * are stored in the given frequency array. 
+ */
 static void *worker_remove(void *data) {
   Remove_Work *work = data;
-  act_list_remove(work->list, work->result, ACT_COUNT);
+  remove_n(work->list, work->freq, ACT_COUNT);
   pthread_exit(NULL);
 }
 
+
+/**
+ * Test of function list_add.
+ *
+ * 1. Start THREAD_NUM threads each adding ACT_COUNT nodes to the list.
+ * 2. Asserts that list.len is THREAD_NUM * ACT_COUNT.
+ * 3. Removes and stores all node values in a frequency array.
+ * 4. Asserts that list is empty.
+ * 6. Asserts that each value in the frequency array is equal to THREAD_NUM.
+ */
+static char *test_add() {
+  List *list = list_new();
+  int freq[ACT_COUNT] = {};
+
+  // Add nodes in parallel
+  mu_assert(
+    "Unable to create/join thread",
+    assert_work(list, worker_add));
+
+  mu_assert(
+      "Invalid list length",
+      THREAD_NUM * ACT_COUNT == list->len);
+
+  // Remove all nodes and store their value frequency
+  remove_n(list, freq, list->len);
+
+  // List should now be empty
+  mu_assert(
+    "List not empty",
+    assert_empty(list));
+
+  mu_assert(
+    "Missing/duplicated node detected",
+    assert_freq(freq, THREAD_NUM));
+
+  free(list);
+  return 0;
+}
+
+/**
+ * Test of function list_remove.
+ *
+ * 1. Adds THREAD_NUM * ACT_COUNT nodes to the list sequentially.
+ * 2. Starts THREAD_NUM threads, each attempting to remove ACT_COUNT nodes
+      and store the values in a frequency array local to the thread.
+ * 3. Asserts that list is empty.
+ * 5. Collects the frequency arrays off all threads and asserts that each value
+ 	  of the final frequency array is equal to THREAD_NUM.
+ */
 static char *test_remove() {
-  int i;
   List *list = list_new();
-  pthread_t tid[THREAD_NUM];
-  Remove_Work *works = malloc(THREAD_NUM * sizeof(Remove_Work));
-  int freq[ACT_COUNT];
+  int i, j;
 
-  act_list_add_all(list);
+  // Add nodes to list
+  for (i = 0; i < THREAD_NUM; i++)
+  {
+    for (j = 0; j < ACT_COUNT; j++) {
+      int *value = malloc(sizeof(int));
+      *value = j;
 
-  i = -1;
-  while (++i < ACT_COUNT) {
-    freq[i] = 0;
-  }
+      Node *node = node_new();
+      node->elm = value;
 
-  i = -1;
-  while (++i < THREAD_NUM) {
-    Remove_Work *work = malloc(sizeof(Remove_Work));
-    int result[ACT_COUNT];
-
-    // Zero out list
-    int j = -1;
-    while (++j < ACT_COUNT) {
-      result[j] = 0;
-    }
-
-    work->list = list;
-    work->result = result;
-    works[i] = *work;
-
-    mu_assert(
-      "Thread creation failed",
-      0 == pthread_create(&tid[i], NULL, worker_remove, (void *) work));
-  }
-
-
-  i = -1;
-  while (++i < THREAD_NUM) {
-    mu_assert(
-      "Thread join failed",
-      0 == pthread_join(tid[i], NULL));
-
-    int j = -1;
-    while (++j < ACT_COUNT) {
-      freq[works[i].result[j]]++;
+      list_add(list, node);
     }
   }
 
-  assert_list_length_min(list);
+  // Create work structs for threads
+  Remove_Work work_arr[THREAD_NUM];
+  for (i = 0; i < THREAD_NUM; ++i)
+  {
+    int *freq = malloc(sizeof(int) * ACT_COUNT);
+    for (j = 0; j < ACT_COUNT; ++j)
+    {
+      freq[j] = 0;
+    }
 
-  assert_list_empty(list);
-
-  assert_list_integrity(freq);
-
-  free(works);
-  return 0;
-}
-
-typedef struct dyn_remove_work {
-  List *list;
-  int *result;
-  int length;
-} Dyn_Remove_Work;
-
-static void *worker_dyn_remove(void *data) {
-  Dyn_Remove_Work *work = data;
-
-  Node *node = list_remove(work->list);
-
-  while (node != NULL) {
-    int value = (intptr_t) node->elm;
-
-    work->result[value]++;
-    work->length++;
-
-    node = list_remove(work->list);
+    work_arr[i].list = list;
+    work_arr[i].freq = freq;
   }
 
-  pthread_exit(NULL);
+  // Remove nodes in parallel
+  mu_assert(
+    "Unable to create/join thread",
+    assert_work_arr(work_arr, sizeof(Remove_Work), worker_remove));
+
+  // List should now be empty
+  mu_assert(
+    "List not empty",
+    assert_empty(list));
+
+  // Collect all frequencies into a shared array
+  int freq_shared[ACT_COUNT] = {};
+  freq_remove_work(work_arr, freq_shared, THREAD_NUM);
+
+  mu_assert(
+    "Missing/duplicated node detected",
+    assert_freq(freq_shared, THREAD_NUM));
+
+  // Free memory
+  for (i = 0; i < THREAD_NUM; ++i)
+  {
+    free(work_arr[i].freq);
+  }
+  free(list);
+	return 0;
 }
 
+/**
+ * Test of function list_add and list_remove in parallel.
+ * 
+ * 1. Starts THREAD_NUM threads, half of which adds and half of which removes
+ * 	  ACT_COUNT nodes. The removing threads store the node values in
+      a frequency array local to the thread.
+ * 2. Collects the frequency arrays of all threads in a shared frequency array.
+ * 3. Removes and stores all remaining node values in the shared frequency array.
+ * 4. Asserts that list is empty.
+ * 6. Asserts that each value in the shared frequency array is equal to THREAD_NUM/2.
+ */
 static char *test_add_remove() {
-  int i;
   List *list = list_new();
-  pthread_t tid[THREAD_NUM];
-  Dyn_Remove_Work rem_works[THREAD_NUM];
+  int i, j;
 
-  i = -1;
-  while (++i < THREAD_NUM) {
+  // Equal amount of threads for adding and removing
+  int half_thread_num = THREAD_NUM / 2;
+  int thread_num = half_thread_num * 2;
+
+  // Thread ids for add and remove workers
+  pthread_t add_tids[half_thread_num];
+  pthread_t rem_tids[half_thread_num];
+
+  // Create work structs for remove workers
+  Remove_Work rem_work_arr[half_thread_num];
+  for (i = 0; i < half_thread_num; ++i)
+  {
+    int *freq = malloc(sizeof(int) * ACT_COUNT);
+    for (j = 0; j < ACT_COUNT; ++j)
+    {
+      freq[j] = 0;
+    }
+
+    rem_work_arr[i].list = list;
+    rem_work_arr[i].freq = freq;
+  }
+
+  // Start interleaved add and remove worker threads
+  for (i = 0; i < thread_num; ++i)
+  {
+    int result;
+
     if (i % 2 == 0) {
-      // Create add thread
-      mu_assert(
-        "Thread creation failed",
-        0 == pthread_create(&tid[i], NULL, worker_add, (void *) list));
+      // Create add worker
+      result = pthread_create(&add_tids[i/2], NULL, worker_add, list);
+    } else {
+      // Create remove worker
+      result = pthread_create(&rem_tids[i/2], NULL, worker_remove, &rem_work_arr[i/2]);
     }
-    else {
-      // Create remove thread
-      int *result = malloc(ACT_COUNT * sizeof(int));
 
-      // Zero out list
-      int j = -1;
-      while (++j < ACT_COUNT) {
-        result[j] = 0;
-      }
-
-      rem_works[i].list = list;
-      rem_works[i].result = result;
-      rem_works[i].length = 0;
-
-      // Create add thread
-      mu_assert(
-        "Thread creation failed",
-        0 == pthread_create(&tid[i], NULL, worker_dyn_remove, &rem_works[i]));
-    }
-  }
-
-  int freq[ACT_COUNT];
-
-  i = -1;
-  while (++i < THREAD_NUM) {
-    // Join all threads
     mu_assert(
-      "Thread join failed",
-      0 == pthread_join(tid[i], NULL));
-
-    if (i % 2 != 0) {
-      // Is a remove thread
-      int j = -1;
-      while (++j < ACT_COUNT) {
-        freq[rem_works[i].result[j]]++;
-      }
-    }
+        "Unable to create thread",
+        0 == result);
   }
 
-  act_list_remove_all(list, freq);
+  // Join add threads
+  for (i = 0; i < half_thread_num; ++i)
+  {
+    mu_assert(
+        "Unable to join thread",
+        0 == pthread_join(add_tids[i], NULL));
+  }
 
-  assert_list_length_min(list);
+  // Join remove threads
+  for (i = 0; i < half_thread_num; ++i)
+  {
+    mu_assert(
+        "Unable to join thread",
+        0 == pthread_join(rem_tids[i], NULL));
+  }
 
-  assert_list_empty(list);
+  // Collect all frequencies from remove structs into a shared array
+  int freq_shared[ACT_COUNT] = {};
+  freq_remove_work(rem_work_arr, freq_shared, half_thread_num);
 
-  assert_list_integrity(freq);
+  // Remove and store the value of all nodes that remain in the list.
+  // (Remove workers likely did remove get them all)
+  remove_n(list, freq_shared, list->len);
 
-  return 0;
+  // List should now be empty
+  mu_assert(
+    "List not empty",
+    assert_empty(list));
+
+  mu_assert(
+    "Missing/duplicated node detected",
+    assert_freq(freq_shared, half_thread_num));
+
+  // Free memory
+  for (i = 0; i < half_thread_num; ++i)
+  {
+    free(rem_work_arr[i].freq);
+  }
+  free(list);
+
+	return 0;
 }
-
 
 static char *all_tests() {
   mu_run_test(test_add);
