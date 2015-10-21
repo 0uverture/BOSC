@@ -16,6 +16,8 @@ pthread_mutex_t mutex;
 /* list_new: return a new list structure */
 List *list_new(void)
 {
+  pthread_mutex_init(&mutex, NULL);
+
   List *l;
 
   l = (List *) malloc(sizeof(List));
