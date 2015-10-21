@@ -27,136 +27,190 @@ void Sleep(float wait_time_ms)
   usleep((int) (wait_time_ms * 1e3f)); // convert from ms to us
 }
 
-void print_available(){
-	printf("Now available: ");
-	int i;
-	for (i = 0; i < n; ++i)
-	{
-		printf("%d ", s->available[i]);
-	}
-	printf("\n");
+/*Malloc for nested arrays.*/
+int nested_array_malloc(int n, int m, int** *arr)
+{
+  *arr = malloc(m * sizeof(int *));
+  if (*arr == NULL){ printf("Allocation failed."); return 0;}
+  int k;
+  for(k = 0; k < m; k++){
+    (*arr)[k] = malloc(n * sizeof(int));
+    if ((*arr)[k] == NULL){ printf("Allocation failed."); return 0;}
+  }
+  return 1;
 }
-/*Returns a pseudo-random integer between 0 and given limit.*/
+
+/*Creates a deep copy of state for the purpose of checking whether the state is legal or not.*/
+State create_deep_copy(){
+  //Create deep copy containing available, allocation and need for the check_state simulation.
+  State *sdc;
+  sdc = malloc(sizeof(State));
+  sdc->available = (int*) malloc(n*sizeof(int));
+  nested_array_malloc(n, m, &sdc->allocation);
+  nested_array_malloc(n, m, &sdc->need);
+  int i, j;
+  for (i = 0; i < m; ++i)
+  {
+    for (j = 0; j < n; ++j)
+    {
+      sdc->need[i][j] = s->need[i][j];
+      sdc->allocation[i][j] = s->allocation[i][j];
+      sdc->available[j] = s->available[j];       
+    }
+  }
+  return *sdc;
+}
+
+void print_available(){
+  printf("Now available: ");
+  int i;
+  for (i = 0; i < n; ++i)
+  {
+    printf("%d ", s->available[i]);
+  }
+  printf("\n");
+}
+
+/*Returns a pseudo-random non-uniform integer between 0 and given limit.*/
 int random_number(int lim){
-	return lim * (((double)rand() / (double)RAND_MAX) + 0.5 );
+  double ran = (double) lim * ((double)rand() / (double)RAND_MAX);
+  int res = 0;
+  if ((ran - (int) ran) >= 0.50){
+    res = (int) ran + 1.0;
+  } else res = (int) ran;
+  return res;
+}
+
+/* Release the resources in request for process i */
+void resource_release(int i, int *request)
+{
+  pthread_mutex_lock(&state_mutex);
+  int j;
+  for (j = 0; j < n; ++j)
+  {
+    s->available[j] += request[j];
+    s->need[i][j] += request[j];
+    s->allocation[i][j] -= request[j];
+  }
+  printf("Resources released by process %d\n", i);
+  print_available();
+  pthread_mutex_unlock(&state_mutex);
 }
 
 /* Allocate resources in request for process i, only if it 
    results in a safe state and return 1, else return 0 */
 int resource_request(int i, int *request)
 {
-	print_available();
-	printf("Process %d Requesting: %d %d %d\n", i, request[0], request[1], request[2]);
-	int j;
-	for (j = 0; j < n; ++j)
-	{
-		if(request[j] > s->available[j]){ printf("Request denied.\n"); return 0; }
-	}
+  pthread_mutex_lock(&state_mutex);
+  int j;
+  for (j = 0; j < n; ++j)
+  {
+    if(request[j] > s->available[j]){ printf("Request denied.\n"); return 0; }
+  }
 
-	for (j = 0; j < n; ++j)
-	{
-		s->available[j] -= request[j];
-		s->need[i][j] -= request[j];
-		s->allocation[i][j] += request[j];
-	}
-	printf("Request approved.\n");
-	print_available();
- 	
-	request[0] = 0;
-	request[1] = 0;
-	request[2] = 0;
+  for (j = 0; j < n; ++j)
+  {
+    s->available[j] -= request[j];
+    s->need[i][j] -= request[j];
+    s->allocation[i][j] += request[j];
+  }
 
- 	return 1;
-}
+  //CHECK STATE.
+  if (!check_state(create_deep_copy())){
+    printf("REQUEST ABOUT TO BE DENIED.\n");
 
-/* Release the resources in request for process i */
-void resource_release(int i, int *request)
-{
-	int j;
-	for (j = 0; j < n; ++j)
-	{
-		s->available[j] += request[j];
-		s->need[i][j] += request[j];
-		s->allocation[i][j] -= request[j];
-	}
-	printf("Resources released by process %d\n", i);
-	print_available();
+
+
+    printf("Request from process %d denied\n", i);
+    pthread_mutex_unlock(&state_mutex);
+    resource_release(i, request);
+    return 0;
+  }
+
+  printf("Request approved.\n");
+  print_available();
+  pthread_mutex_unlock(&state_mutex);
+  return 1;
 }
 
 /* Generate a request vector */
 void generate_request(int i, int *request)
 {
-  	int j;
-  	while(is_empty(request)){
-    	for (j = 0;j < n; j++) {
-    		printf("S need is %d\n", s->need[i][j]);
-      		request[j] = random_number(s->need[i][j]);
-    	}
-	}
+    int j, sum;
+    while(!sum){
+      for (j = 0;j < n; j++) {
+          request[j] = random_number(s->need[i][j]);
+      sum += request[j];
+      }
+  }
 }
 
 /* Generate a release vector */
 void generate_release(int i, int *request)
 {
-  int j;
-  	while(is_empty(request)){
-    	for (j = 0;j < n; j++) {
-      		request[j] = random_number(s->allocation[i][j]);
-    	}
-	}
-	printf("Releasing resources %d %d %d\n", request[0], request[1], request[2]);
-}
-
-int nested_array_malloc(int n, int m, int** *arr)
-{
-	*arr = malloc(m * sizeof(int *));
-	if (*arr == NULL){ printf("Allocation failed."); return 0;}
-	int k;
-	for(k = 0; k < m; k++){
-		(*arr)[k] = malloc(n * sizeof(int));
-		if ((*arr)[k] == NULL){ printf("Allocation failed."); return 0;}
-	}
-	return 1;
+  int j, sum;
+    while(!sum){
+      for (j = 0;j < n; j++) {
+          request[j] = random_number(s->allocation[i][j]);
+      sum += request[j];
+      }
+  }
 }
 
 /*Returns true if given resource array only contains 0*/
 int is_empty(int* arr){
-	int i;
-	for (i = 0; i < n; ++i)
-	{
-		if(arr[i] != 0) return 0; 
-	}
-	return 1;
+  int i;
+  for (i = 0; i < n; ++i)
+  {
+    if(arr[i] != 0) return 0; 
+  }
+  return 1;
 }
 
 /*Checks if given state is legal*/
 int check_state(State ss){
-	int i, j, procflag = 1;
-	for(i = 0; i < m; i++){
-		if(!is_empty(ss.need[i])){
-			for (j = 0; j < n; ++j)
-			{
-				//If not enough resources are available, set flag to false.
-				if((ss.available[j] - ss.need[i][j]) < 0) procflag = 0;
-			}
-			if(procflag){
-				//Enough resources can be allocated to a process.
-				printf("Simulating completion of process %d\n", i);
-				for (j = 0; j < n; ++j)
-				{
-					//Simulate process finishing and releasing all resources.
-					ss.need[i][j] = 0;
-					ss.available[j] = ss.available[j] + ss.allocation[i][j];
-					ss.allocation[i][j] = 0;
-				}
-				procflag = 1;
-				//Check if new state is legal.
-				return check_state(ss);
-			}		
-		return 0;
-		}
-	}
-	return 1;
+  int i, j, procflag = 1;
+  for(i = 0; i < m; i++){
+    if(!is_empty(ss.need[i])){
+      for (j = 0; j < n; ++j)
+      {
+        //If not enough resources are available, set flag to false.
+        if((ss.available[j] - ss.need[i][j]) < 0) {procflag = 0; printf("Process %d can't be run.\n", i);}
+      }
+      if(procflag){
+        //Enough resources can be allocated to a process.
+        for (j = 0; j < n; ++j)
+        {
+          //Simulate process fin*ishing and releasing all resources.
+          ss.need[i][j] = 0;
+          ss.available[j] = ss.available[j] + ss.allocation[i][j];
+          ss.allocation[i][j] = 0;
+        }
+        procflag = 1;
+        //Check if new state is legal.
+        return check_state(ss);
+      }
+      /*
+      printf("Need matrix:\n");
+        for(i = 0; i < n; i++)
+        printf("R%d ", i+1);
+        printf("\n");
+        for(i = 0; i < m; i++) {
+    for(j = 0; j < n; j++)
+      printf("%d  ",ss.need[i][j]);
+    printf("\n");
+  }
+  printf("Availability vector:\n");
+  for(i = 0; i < n; i++)
+    printf("R%d ", i+1);
+  printf("\n");
+  for(j = 0; j < n; j++)
+    printf("%d  ",ss.available[j]);
+  printf("\n");*/
+    return 0;
+    }
+  }
+  return 1;
 }
 
 /* Threads starts here */
@@ -166,14 +220,18 @@ void *process_thread(void *param)
   int i = (int) (long) param, j;
   /* Allocate request vector */
   int *request = malloc(n*sizeof(int));
-  if (request == NULL) {printf("Memory allocation failed for s\n"); return(0); }
+  int iReq;
+  for (iReq = 0; i < n; ++i)
+  {
+    request[iReq] = 0;
+  }
 
   while (1) {
     /* Generate request */
     generate_request(i, request);
     while (!resource_request(i, request)) {
       /* Wait */
-    	printf("Request denied. Sleeping.\n");
+      printf("Request denied. Sleeping.\n");
       Sleep(100);
     }
     /* Generate release */
@@ -189,22 +247,6 @@ void *process_thread(void *param)
 
 int main(int argc, char* argv[])
 {
-//Rand test
-/*	int swag, zero = 0, one = 0, two = 0, wtf;
-	for (swag = 0; swag < 1000; ++swag)
-	{
-		wtf = random_number(1);
-		printf("Wtf is %d\n", wtf);
-		if(wtf){
-			one++;
-		}
-		else {
-			zero++;
-		}
-	}
-	printf("Ones: %d Zeroes: %d\n", one, zero);
-	exit(0);*/
-
 
   /* Get size of current state as input */
   int i, j;
@@ -230,7 +272,7 @@ int main(int argc, char* argv[])
   /* Get current state as input */
   printf("Resource vector: ");
   for(i = 0; i < n; i++)
-  	scanf("%d", &s->resource[i]);
+    scanf("%d", &s->resource[i]);
   printf("Enter max matrix: ");
   for(i = 0;i < m; i++)
     for(j = 0;j < n; j++)
@@ -273,30 +315,11 @@ int main(int argc, char* argv[])
     printf("%d  ",s->available[j]);
   printf("\n");
 
-  //THE DEEP COPY ZONE
-  //Create deep copy containing available, allocation and need for the check_state simulation.
-  State *sdc;
-  sdc = malloc(sizeof(State));
-  sdc->available = (int*) malloc(n*sizeof(int));
-  nested_array_malloc(n, m, &sdc->allocation);
-  nested_array_malloc(n, m, &sdc->need);
-
-  for (i = 0; i < m; ++i)
-  {
-  	for (j = 0; j < n; ++j)
-  	{
-  		sdc->need[i][j] = s->need[i][j];
-  		sdc->allocation[i][j] = s->allocation[i][j];
-  		sdc->available[j] = s->available[j];  		 
-  	}
-  }
-	//THE DEEP COPY ZONE
-
   /* If initial state is unsafe then terminate with error */
-  if(check_state(*sdc)) { printf("Initial state is legal.\n"); }
+  if(check_state(create_deep_copy())) { printf("Initial state is legal.\n"); }
   else { 
-  	printf("Initial state is illegal. Please check your input.\n");
-  	exit(EXIT_FAILURE);
+    printf("Initial state is illegal. Please check your input.\n");
+    exit(EXIT_FAILURE);
   }
 
   /* Seed the random number generator */
@@ -304,13 +327,11 @@ int main(int argc, char* argv[])
   gettimeofday(&tv, NULL);
   srand(tv.tv_usec);
 
-  //srand(time(NULL));
-
   /* Create m threads */
   pthread_t *tid = malloc(m*sizeof(pthread_t));
-  for (i = 0; i < 1; i++)
+  for (i = 0; i < m; i++)
     pthread_create(&tid[i], NULL, process_thread, (void *) (long) i);
-  	
+    
   /* Wait for threads to finish */
   pthread_exit(0);
   free(tid);
