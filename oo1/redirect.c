@@ -17,37 +17,31 @@
 
 #include "redirect.h"
 
-int redirect_stdinandout(char *infilename, char *outfilename)
+int redirect_stdinandout(int pidIn, int pidOut)
 {
-	if (infilename != NULL) {
-		redirect_stdin(infilename);
-	}
-	if (outfilename != NULL) {
-		redirect_stdout(outfilename);
-	}
+	if (pidIn != -1)
+		redirect_stdin(pidIn);
+	if (pidOut != -1)
+		redirect_stdout(pidOut);
 }
 
-int redirect_stdin(char *infilename)
+int redirect_stdin(int pidIn)
 {
-	/* manipulate the file descriptor of the child process */
-	int fid = open(infilename, O_RDONLY);
 	/* Replace stdin of the child process with fid */
 	close(0); /* 0 = stdin */
-	dup(fid);
+	dup2(pidIn, 0);
 	/* Close fid */
-	close(fid);
+	close(pidIn);
   	return 0;
 }
 
-int redirect_stdout(char *outfilename)
+int redirect_stdout(int pidOut)
 {
-	/* manipulate the file descriptor of the child process */
-	int fid = open(outfilename, O_WRONLY|O_CREAT);
 	/* Replace stdin of the child process with fid */
 	close(1); /* 0 = stdin */
-	dup(fid);
+	dup2(pidOut, 1);
 	/* Close fid */
-	close(fid);
+	close(pidOut);
   	return 0;
 }
 

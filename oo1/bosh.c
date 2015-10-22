@@ -11,6 +11,10 @@
 #include <string.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <fcntl.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "redirect.h"
@@ -40,51 +44,100 @@ char *gethostname(char *hostname)
 int executeshellcmd (Shellcmd *shellcmd)
 {
   Cmd *cmdlist = shellcmd->the_cmds;
-  
-  while (cmdlist != NULL ) {
+  int background = shellcmd->background;
+  char *infilename = shellcmd->rd_stdin;
+  char *outfilename = shellcmd->rd_stdout;
+
+  // Count amount of commands (pipe-components)
+  Cmd *cmdlistCounter = cmdlist;
+  int cmdAmount = 0;
+  while(cmdlistCounter != NULL){
+    cmdlistCounter = cmdlistCounter->next;
+    cmdAmount++;
+  }
+  printf("Command amount: %d\n", cmdAmount);
+
+  int fd[2]; // New pipe declared
+
+  int in  = -1; // In being used at execution
+  int out  = -1; // Out to be passed on
+  int last_out; // Out to use
+  if (outfilename != NULL) {
+    last_out = open(outfilename, O_WRONLY|O_CREAT);
+  }
+  else {
+    last_out = -1;
+  }
+
+  pid_t pids[cmdAmount];
+  int i;
+  for (i = 0; cmdlist != NULL; i++ ) {
     char **cmd = cmdlist->cmd; // Current command
     cmdlist = cmdlist->next; // Iteration
 
-    // Retrieve next command if any
-    char **scndCmd = NULL;
-    if (cmdlist != NULL) // if true: pipe was used
-      scndCmd = cmdlist->cmd; // Next command
+    // Init pipe if another command exists
+    if (cmdlist != NULL) {
+      // if true: pipe was used
+      if (pipe(fd) < 0) {
+        printf("Error when creating pipe.\n");
+        return -1;
+      }
+      in = fd[0];
+      out = fd[1];
+    }
+    else {
+      // Last command (First input command - replace input if any inputfile provided)
+      if (infilename != NULL) {
+        in = open(infilename, O_RDONLY);
+      }
+      else {
+        in = -1;
+      }
+      out = -1;
+    }
 
-    // Control-prints:
-    printf("First command: '%s'\n", cmd[0]);
-    if (scndCmd != NULL)
-      printf("Second command: '%s'\n", scndCmd[0]);
-    
-    printshellcmd(shellcmd);
+    printf("Before execution of %s: in: %d, out: %d, last_out: %d\n", *cmd, in, out, last_out);
 
     // Execution
-
-    // Store infile and outfile in variables
-    char *rd_stdin = shellcmd->rd_stdin;
-    char *rd_stdout = shellcmd->rd_stdout;
-    // Background vs. Foreground
-    if (shellcmd->background == 1) { // Execute command without waiting for finished execution
-      if (scndCmd != NULL) { // Perform piping
-        pipecmd(*cmd, cmd, *scndCmd, scndCmd, 1); // Performing pipe with current and next command (with their args) in bg
-        if (cmdlist != NULL) {
-          cmdlist = cmdlist->next; // Avoid executing 2nd part of pipe (?)
-        }
+    pid_t pid = fork();
+    pids[i] = pid;
+    if (pid == 0) { // child
+      if(out != -1) {
+        close(out);
       }
-      else {
-        backgroundcmd(*cmd, cmd, rd_stdin, rd_stdout);
+      redirect_stdinandout(in, last_out);
+      int status = execvp(*cmd, cmd); // Execute current command
+      if (status == -1) {
+        printf("Command not found.\n");
+        exit(1);
       }
     }
-    else { // Execute command and wait for it
-      if (scndCmd != NULL) { // Perform piping
-        pipecmd(*cmd, cmd, *scndCmd, scndCmd, 0); // Performing pipe with current and next command (with their args) in fg
-        if (cmdlist != NULL)
-          cmdlist = cmdlist->next; // Avoid executing 2nd part of pipe (?)
-      }
-      else {
-        foregroundcmd(*cmd, cmd, rd_stdin, rd_stdout);
+
+    if(in != -1) {
+      close(in);
+    }
+    if(last_out != -1) {
+      close(last_out);
+    }
+
+    if(cmdlist != NULL) {
+      // Update last_out for next command
+      last_out = out;
+    }
+    else {
+      // No next command: Close file if not null, just in case
+      if(out != -1) {
+        close(out);
       }
     }
   }
+
+  if(!background){ // Wait for all processes
+    for(i = 0; i < cmdAmount; i++){
+      waitpid(pids[i], NULL, 0);
+    }
+  }
+
   return 0;
 }
 
