@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 
+http://stackoverflow.com/questions/822323/how-to-generate-a-random-number-in-c
 int randint(int n) {
   if (!n) return 0;
 
