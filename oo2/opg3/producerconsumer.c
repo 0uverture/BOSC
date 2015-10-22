@@ -45,9 +45,7 @@ void *produce(void *data)
 			// Generate item name
 			// 5 chars in "Item_"
 			char itemName[5 + 1 + ITEM_ID/10];
-			pthread_mutex_lock(&mutexItemId);
 			sprintf(itemName, "Item_%d", ITEM_ID++);
-			pthread_mutex_unlock(&mutexItemId);
 			// Produce the item
 			list_add(fifo, node_new_str(itemName));
 			// Print
