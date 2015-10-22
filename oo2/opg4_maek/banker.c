@@ -3,6 +3,7 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include "minunit.h"
 
 typedef struct state {
   int *resource;
@@ -21,14 +22,18 @@ pthread_mutex_t state_mutex;
 
 static void print_res(int *res) {
   int i;
-  printf("[DEBUG] ");
-  for(i = 0; i < n; i++)
-    printf("R%d ", i+1);
-  printf("\n[DEBUG] ");
-  for(i = 0; i < n; i++)
-    printf("%d  ", s->available[i]);
-  printf("\n");
-  printf("\n");
+
+  printf("[INFO] ");
+  for (i = 0; i < n; ++i) {
+    printf("R%d ", i);
+  }
+
+  printf("\n[INFO] ");
+  for (i = 0; i < n; ++i) {
+    printf("%d  ", i);
+  }
+
+  printf("\n\n");
 }
 
 static int **matrix_alloc() {
@@ -178,9 +183,13 @@ void Sleep(float wait_time_ms)
 int resource_request(int i, int *request)
 {
   pthread_mutex_lock(&state_mutex);
-  printf("[INFO] Processing request from P%d\n", i);
-  printf("[DEBUG] Request:\n");
-  print_res(request);
+  printf("[INFO] Processing request from P%d (", i);
+  int j;
+  for (j = 0; j < n-1; ++j)
+  {
+    printf("%d, ", request[j]);
+  }
+  printf("%d)\n", request[n-1]);
 
   if (request_safe(request, i, s)) {
     vec_sub_ass(s->available, request);
@@ -188,15 +197,13 @@ int resource_request(int i, int *request)
     vec_sub_ass(s->need[i], request);
 
     printf("[INFO] Request from P%d accepted\n", i);
-    printf("[DEBUG] Availability:\n");
+    printf("[INFO] Availability changed:\n");
     print_res(s->available);
     pthread_mutex_unlock(&state_mutex);
     return 1;
   }
 
   printf("[INFO] Request from P%d denied\n", i);
-  printf("[DEBUG] Availability:\n");
-  print_res(s->available);
   pthread_mutex_unlock(&state_mutex);
   return 0;
 }
@@ -210,8 +217,15 @@ void resource_release(int i, int *request)
   vec_sub_ass(s->allocation[i], request);
   vec_add_ass(s->need[i], request);
 
-  printf("[INFO] P%d released resources\n", i);
-  printf("[DEBUG] Availability:\n");
+  printf("[INFO] P%d released resources (", i);
+  int j;
+  for (j = 0; j < n-1; ++j)
+  {
+    printf("%d, ", request[j]);
+  }
+  printf("%d)\n", request[n-1]);
+
+  printf("[INFO] Availability changed:\n");
   print_res(s->available);
   pthread_mutex_unlock(&state_mutex);
 }
@@ -287,8 +301,174 @@ void *process_thread(void *param)
   free(request);
 }
 
+static bool test_matrix_eq(int mat1[n][m], int **mat2) {
+  int i, j;
+  for(i = 0; i < m; i++) 
+    for(j = 0; j < n; j++)
+      if (mat1[i][j] != mat2[i][j]) return false;
+
+  return true;
+}
+
+static char *test() {
+  m = n = 3;
+  s = state_alloc();
+
+  // Set inital state
+  s->available[0] = 4;
+  s->available[1] = 2;
+  s->available[2] = 1;
+
+
+  s->need[0][0] = 3;
+  s->need[0][1] = 2;
+  s->need[0][2] = 3;
+
+  s->need[1][0] = 1;
+  s->need[1][1] = 3;
+  s->need[1][2] = 0;
+
+  s->need[2][0] = 3;
+  s->need[2][1] = 2;
+  s->need[2][2] = 1;
+
+
+  s->allocation[0][0] = 2;
+  s->allocation[0][1] = 2;
+  s->allocation[0][2] = 0;
+
+  s->allocation[1][0] = 1;
+  s->allocation[1][1] = 0;
+  s->allocation[1][2] = 0;
+
+  s->allocation[2][0] = 1;
+  s->allocation[2][1] = 2;
+  s->allocation[2][2] = 3;
+
+
+  // Reqest invalid vector
+  int req0[3] = { 0, 0, 1 };
+  mu_assert(
+    "Request was not denied",
+    !resource_request(0, req0));
+
+
+  // Request valid vector
+  int req2[3] = { 2, 2, 1 };
+  mu_assert(
+    "Request was not accepted",
+    resource_request(2, req2));
+
+  // Expected resulting state
+  int req2_available[3] = { 2, 0, 0 };
+  int req2_need[3][3] = {
+    { 3, 2, 3 },
+    { 1, 3, 0 },
+    { 1, 0, 0}
+  };
+  int req2_allocation[3][3] = {
+    { 2, 2, 0 },
+    { 1, 0, 0 },
+    { 3, 4, 4 }
+  };
+
+  // Assert resulting state
+  mu_assert(
+    "Available vector invalid",
+    0 == memcmp(req2_available, s->available, n));
+
+  mu_assert(
+    "Need matrix invalid",
+    test_matrix_eq(req2_need, s->need));
+
+  mu_assert(
+    "Allocation matrix invalid",
+    test_matrix_eq(req2_allocation, s->allocation));
+
+
+  // Request valid vector
+  int req1[3] = { 1, 0, 0 };
+  mu_assert(
+    "Request was not accepted",
+    resource_request(1, req1));
+
+  // Expected resulting state
+  int req1_available[3] = { 1, 0, 0 };
+  int req1_need[3][3] = {
+    { 3, 2, 3 },
+    { 0, 3, 0 },
+    { 1, 0, 0}
+  };
+  int req1_allocation[3][3] = {
+    { 2, 2, 0 },
+    { 2, 0, 0 },
+    { 3, 4, 4 }
+  };
+
+  // Assert resulting state
+  mu_assert(
+    "Available vector invalid",
+    0 == memcmp(req1_available, s->available, n));
+
+  mu_assert(
+    "Need matrix invalid",
+    test_matrix_eq(req1_need, s->need));
+
+  mu_assert(
+    "Allocation matrix invalid",
+    test_matrix_eq(req1_allocation, s->allocation));
+
+
+  // Release vector
+  int rel2[3] = { 3, 0, 0 };
+  resource_release(2, rel2);
+
+  // Expected resulting state
+  int rel2_available[3] = { 4, 0, 0 };
+  int rel2_need[3][3] = {
+    { 3, 2, 3 },
+    { 0, 3, 0 },
+    { 4, 0, 0}
+  };
+  int rel2_allocation[3][3] = {
+    { 2, 2, 0 },
+    { 2, 0, 0 },
+    { 0, 4, 4 }
+  };
+
+  // Assert resulting state
+  mu_assert(
+    "Available vector invalid",
+    0 == memcmp(rel2_available, s->available, n));
+
+  mu_assert(
+    "Need matrix invalid",
+    test_matrix_eq(rel2_need, s->need));
+
+  mu_assert(
+    "Allocation matrix invalid",
+    test_matrix_eq(rel2_allocation, s->allocation));
+
+
+  state_free(s);
+  return 0;
+}
+
 int main(int argc, char* argv[])
 {
+  if (argc >= 2 && strcmp(argv[1], "test") == 0) {
+    char *result = test();
+    if (result != 0) {
+      printf("[TEST] %s\n", result);
+      printf("[TEST] Test failure\n");
+    }
+    else {
+      printf("[TEST] All tests passed\n");
+    }
+
+    return result != 0;
+  }
+
   /* Get size of current state as input */
   int i, j;
   printf("Number of processes: ");
