@@ -256,6 +256,7 @@ void generate_request(int i, int *request)
 {
   int j, sum = 0;
   while (!sum) {
+    if (i == 0) printf("[DEBUG] generate_request (P%d) \n", i);
     for (j = 0;j < n; j++) {
       request[j] = randint(s->need[i][j]);
       sum += request[j];
@@ -269,8 +270,22 @@ void generate_release(int i, int *request)
 {
   int j, sum = 0;
   while (!sum) {
+    if (i == 0) {
+      printf("[DEBUG] generate_release (P%d) \n", i);
+      printf("[DEBUG] (%d, %d, %d)\n",
+        s->allocation[i][0],
+        s->allocation[i][1],
+        s->allocation[i][2]);
+    }
+
     for (j = 0;j < n; j++) {
-      request[j] = randint(s->allocation[i][j]);
+      int r = randint(s->allocation[i][j]);
+
+      if (i == 0) {
+        printf("%d\n", s->allocation[i][j]);
+        printf("%d\n", r);
+      }
+      request[j] = r;
       sum += request[j];
     }
   }
