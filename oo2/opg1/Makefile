@@ -1,8 +1,13 @@
 CC = gcc -ggdb
-LIBS = -lm -pthread
+LIBS = -pthread -lm
 
-sumsqrt: sumsqrt.o
-	${CC} -o $@ sumsqrt.o ${LIBS}
+all: sumsqrt test
+
+sumsqrt: main.o sumsqrt.o
+	${CC} -o $@ sumsqrt.c main.c ${LIBS}
+
+test: test.o sumsqrt.o
+	${CC} -o $@ sumsqrt.c test.c ${LIBS};
 
 clean:
-	rm -rf *.o sumsqrt
+	rm -rf *o sumsqrt test
