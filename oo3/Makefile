@@ -1,6 +1,6 @@
 
-virtmem: main.o page_table.o disk.o program.o
-	gcc main.o page_table.o disk.o program.o -o virtmem
+virtmem: main.o page_table.o disk.o program.o list.o
+	gcc main.o page_table.o disk.o program.o list.o -o virtmem
 
 main.o: main.c
 	gcc -Wall -g -c main.c -o main.o
@@ -13,6 +13,9 @@ disk.o: disk.c
 
 program.o: program.c
 	gcc -Wall -g -c program.c -o program.o
+
+list.o: list.c
+	gcc -Wall -pthread -g -c list.c -o list.o
 
 
 clean:

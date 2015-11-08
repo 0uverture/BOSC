@@ -9,6 +9,7 @@ how to use the page table and disk interfaces.
 #include "page_table.h"
 #include "disk.h"
 #include "program.h"
+#include "list.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,10 +20,25 @@ how to use the page table and disk interfaces.
 
 #define NO_UNUSED_FRAMES -1
 
-page_fault_handler_t page_algo_handler;
 struct disk *disk;
 char *physmem;
+
+// Page replacement algorithm handler
+page_fault_handler_t page_algo_handler;
+
+// Frame table
 int *ft;
+
+// Page queue
+List *pq;
+
+void pq_add_page(int page) {
+	Node *node = node_new();
+	int *elm = malloc(sizeof(int));
+	*elm = page;
+	node->elm = elm;
+	list_add(pq, node);
+}
 
 /**
  * Evaluates if bits contains the PROT_READ flag.
@@ -91,6 +107,12 @@ void rand_handler(struct page_table *pt, int page) {
 	swap_page(pt, out_page, page);
 }
 
+void fifo_handler(struct page_table *pt, int page) {
+	int out_page = * (int *) list_remove(pq)->elm;
+	pq_add_page(page);
+	swap_page(pt, out_page, page);
+}
+
 void page_fault_handler( struct page_table *pt, int page )
 {
 	printf("page fault on page #%d\n", page);
@@ -115,6 +137,7 @@ void page_fault_handler( struct page_table *pt, int page )
 		page_table_set_entry(pt, page, unused_frame, PROT_READ);
 		disk_read(disk, page, &physmem[unused_frame * PAGE_SIZE]);
 		ft[unused_frame] = page;
+		pq_add_page(page);
 	} else {
 		page_algo_handler(pt, page);
 	}
@@ -138,6 +161,8 @@ int main( int argc, char *argv[] )
 
 	if(!strcmp(page_algo,"rand")) {
 		page_algo_handler = rand_handler;
+	} else if(!strcmp(page_algo,"fifo")) {
+		page_algo_handler = fifo_handler;
 	} else {
 		fprintf(stderr,"unknown page replacement algorithm: %s\n", page_algo);
 		exit(EXIT_FAILURE);
@@ -161,6 +186,8 @@ int main( int argc, char *argv[] )
 	{
 		ft[i] = 0;
 	}
+
+	pq = list_new();
 
 	srand(62087);
 
