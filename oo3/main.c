@@ -29,8 +29,16 @@ page_fault_handler_t page_algo_handler;
 // Frame table
 int *ft;
 
+// Frame index
+int fi = 0;
+
 // Page queue
 List *pq;
+
+// Stats
+int disk_reads = 0;
+int disk_writes = 0;
+int page_faults = 0;
 
 void pq_add_page(int page) {
 	Node *node = node_new();
@@ -59,42 +67,32 @@ bool has_write(int bits) {
  * or NO_UNUSED_FRAMES if none are available.
  */
 int next_unused_frame(struct page_table *pt) {
-	int frame, bits, i,
-			npages = page_table_get_npages(pt),
-			nframes = page_table_get_nframes(pt);
-
-	bool unused[nframes];
-	for (i = 0; i < nframes; ++i)
-		unused[i] = true;
-
-	for (i = 0; i < npages; ++i)
-	{
-		page_table_get_entry(pt, i, &frame, &bits);
-		unused[frame] &= !has_read(bits);
-		// LOGIC AND is important, as multiple pages may point to the same frame
-	}
-
-	for (i = 0; i < nframes; ++i)
-		if (unused[i]) return i;
+	int i;
+	
+	for (i = 0; i < page_table_get_nframes(pt); ++i)
+		if (ft[i] == -1) return i;
 
 	return NO_UNUSED_FRAMES;
 }
 
-void swap_page(struct page_table *pt, int out_page, int in_page) {
-	printf("swapping frame of page #%d with page #%d\n", out_page, in_page);
+void swap_page(struct page_table *pt, int in_page, int frame) {
+	if (ft[frame] != -1) {
+		int bits, out_page = ft[frame];
+		page_table_get_entry(pt, out_page, &frame, &bits);
 
-	int frame, bits;
-	page_table_get_entry(pt, out_page, &frame, &bits);
-
-	if(has_write(bits)) {
-		// Memory has been modified - write to disk
-		disk_write(disk, out_page, &physmem[frame * PAGE_SIZE]);
-		disk_read(disk, in_page, &physmem[frame * PAGE_SIZE]);
+		if(has_write(bits)) {
+			// Memory has been modified - write to disk
+			disk_write(disk, out_page, &physmem[frame * PAGE_SIZE]);
+			disk_writes++;
+		}
+	
+		page_table_set_entry(pt, out_page, 0, 0);
+		printf("swapping frame #%d of page #%d with page #%d\n", frame, out_page, in_page);
 	}
-
-	// Update page table
-	page_table_set_entry(pt, out_page, 0, 0);
+	
+	disk_read(disk, in_page, &physmem[frame * PAGE_SIZE]);
 	page_table_set_entry(pt, in_page, frame, PROT_READ);
+	disk_reads++;
 
 	// Update frame table
 	ft[frame] = in_page;
@@ -102,19 +100,33 @@ void swap_page(struct page_table *pt, int out_page, int in_page) {
 
 void rand_handler(struct page_table *pt, int page) {
 	// Get page of random frame from ft
-	int frame = rand() % page_table_get_nframes(pt);
-	int out_page = ft[frame];
-	swap_page(pt, out_page, page);
+	int frame = lrand48() % page_table_get_nframes(pt);
+	swap_page(pt, page, frame);
 }
 
 void fifo_handler(struct page_table *pt, int page) {
-	int out_page = * (int *) list_remove(pq)->elm;
-	pq_add_page(page);
-	swap_page(pt, out_page, page);
+	swap_page(pt, page, fi++ % page_table_get_nframes(pt));
+}
+
+void custom_handler(struct page_table *pt, int page) {
+	int i, frame, bits, nframes = page_table_get_nframes(pt);
+
+	for (frame = fi, i = 0; i < nframes; frame++, i++)
+	{
+		page_table_get_entry(pt, ft[frame % nframes], &frame, &bits);
+		if (!has_write(bits)) {
+			swap_page(pt, page, frame % nframes);
+			fi = frame;
+			return;
+		}
+	}
+
+	fifo_handler(pt, page);
 }
 
 void page_fault_handler( struct page_table *pt, int page )
 {
+	page_faults++;
 	printf("page fault on page #%d\n", page);
 
 	int frame, bits;
@@ -125,8 +137,8 @@ void page_fault_handler( struct page_table *pt, int page )
 		page_table_set_entry(pt, page, frame, bits|PROT_WRITE);
 
 		// DEBUG
-		page_table_print(pt);
-		sleep(1);
+		// page_table_print(pt);
+		// sleep(1);
 
 		return;
 	}
@@ -134,17 +146,14 @@ void page_fault_handler( struct page_table *pt, int page )
 	int unused_frame = next_unused_frame(pt);
 	if (unused_frame != NO_UNUSED_FRAMES) {
 		printf("frame #%d is unused\n", unused_frame);
-		page_table_set_entry(pt, page, unused_frame, PROT_READ);
-		disk_read(disk, page, &physmem[unused_frame * PAGE_SIZE]);
-		ft[unused_frame] = page;
-		pq_add_page(page);
+		swap_page(pt, page, unused_frame);
 	} else {
 		page_algo_handler(pt, page);
 	}
 
 	// DEBUG
-	page_table_print(pt);
-	sleep(1);
+	// page_table_print(pt);
+	// sleep(1);
 }
 
 int main( int argc, char *argv[] )
@@ -163,6 +172,8 @@ int main( int argc, char *argv[] )
 		page_algo_handler = rand_handler;
 	} else if(!strcmp(page_algo,"fifo")) {
 		page_algo_handler = fifo_handler;
+	} else if(!strcmp(page_algo,"custom")) {
+		page_algo_handler = custom_handler;
 	} else {
 		fprintf(stderr,"unknown page replacement algorithm: %s\n", page_algo);
 		exit(EXIT_FAILURE);
@@ -184,12 +195,8 @@ int main( int argc, char *argv[] )
 	int i;
 	for (i = 0; i < nframes; ++i)
 	{
-		ft[i] = 0;
+		ft[i] = -1;
 	}
-
-	pq = list_new();
-
-	srand(62087);
 
 	char *virtmem = page_table_get_virtmem(pt);
 
@@ -208,6 +215,10 @@ int main( int argc, char *argv[] )
 		fprintf(stderr,"unknown program: %s\n", program);
 
 	}
+
+	printf("Disk writes: %d\n", disk_writes);
+	printf("Disk reads:  %d\n", disk_reads);
+	printf("Page faults: %d\n", page_faults);
 
 	free(ft);
 	page_table_delete(pt);
