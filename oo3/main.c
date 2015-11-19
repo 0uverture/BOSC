@@ -79,7 +79,6 @@ void swap_page(struct page_table *pt, int in_page, int frame) {
 		}
 	
 		page_table_set_entry(pt, out_page, 0, 0);
-		//printf("swapping frame #%d of page #%d with page #%d\n", frame, out_page, in_page);
 	}
 	
 	disk_read(disk, in_page, &physmem[frame * PAGE_SIZE]);
@@ -124,33 +123,21 @@ void custom_handler(struct page_table *pt, int page) {
 void page_fault_handler( struct page_table *pt, int page )
 {
 	page_faults++;
-	//printf("page fault on page #%d\n", page);
 
 	int frame, bits;
 	page_table_get_entry(pt, page, &frame, &bits);
 
 	if(has_read(bits)) {
-		//printf("page #%d was written to\n", page);
 		page_table_set_entry(pt, page, frame, bits|PROT_WRITE);
-
-		// DEBUG
-		// page_table_print(pt);
-		// sleep(1);
-
 		return;
 	}
 
 	int unused_frame = next_unused_frame(pt);
 	if (unused_frame != NO_UNUSED_FRAMES) {
-		//printf("frame #%d is unused\n", unused_frame);
 		swap_page(pt, page, unused_frame);
 	} else {
 		page_algo_handler(pt, page);
 	}
-
-	// DEBUG
-	// page_table_print(pt);
-	// sleep(1);
 }
 
 int *run(int npages, int nframes, page_fault_handler_t handler, void (*program)(char *, int)) {
