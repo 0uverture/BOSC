@@ -18,9 +18,10 @@ how to use the page table and disk interfaces.
 #include <unistd.h>
 #include <time.h>
 
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+
 #define NO_UNUSED_FRAMES -1
-#define CLEAR_INTERVAL 5
-#define CUST_RAND_COUNT 10
+#define CUST_RAND_PCT 30
 
 struct disk *disk;
 char *physmem;
@@ -32,12 +33,12 @@ page_fault_handler_t page_algo_handler;
 int *ft;
 
 // Frame index
-int fi = 0;
+int fi;
 
 // Stats
-int disk_reads = 0;
-int disk_writes = 0;
-int page_faults = 0;
+int disk_reads;
+int disk_writes;
+int page_faults;
 
 /**
  * Evaluates if bits contains the PROT_READ flag.
@@ -78,7 +79,7 @@ void swap_page(struct page_table *pt, int in_page, int frame) {
 		}
 	
 		page_table_set_entry(pt, out_page, 0, 0);
-		printf("swapping frame #%d of page #%d with page #%d\n", frame, out_page, in_page);
+		//printf("swapping frame #%d of page #%d with page #%d\n", frame, out_page, in_page);
 	}
 	
 	disk_read(disk, in_page, &physmem[frame * PAGE_SIZE]);
@@ -100,14 +101,16 @@ void fifo_handler(struct page_table *pt, int page) {
 }
 
 void custom_handler(struct page_table *pt, int page) {
-	int i, frame, bits, nframes = page_table_get_nframes(pt);
-	int rand_frames[CUST_RAND_COUNT];
+	int i, frame, bits,
+		nframes = page_table_get_nframes(pt),
+		rand_count = MAX(1, nframes * CUST_RAND_PCT / 100),
+		rand_frames[rand_count];
 
-	for (i = 0; i < CUST_RAND_COUNT; ++i) {
+	for (i = 0; i < rand_count; ++i) {
 		rand_frames[i] = lrand48() % nframes;
 	}
 
-	for (i = 0; i < CUST_RAND_COUNT; ++i) {
+	for (i = 0; i < rand_count; ++i) {
 		page_table_get_entry(pt, ft[rand_frames[i]], &frame, &bits);
 		if (!has_write(bits)) {
 			swap_page(pt, page, frame);
@@ -121,13 +124,13 @@ void custom_handler(struct page_table *pt, int page) {
 void page_fault_handler( struct page_table *pt, int page )
 {
 	page_faults++;
-	printf("page fault on page #%d\n", page);
+	//printf("page fault on page #%d\n", page);
 
 	int frame, bits;
 	page_table_get_entry(pt, page, &frame, &bits);
 
 	if(has_read(bits)) {
-		printf("page #%d was written to\n", page);
+		//printf("page #%d was written to\n", page);
 		page_table_set_entry(pt, page, frame, bits|PROT_WRITE);
 
 		// DEBUG
@@ -139,7 +142,7 @@ void page_fault_handler( struct page_table *pt, int page )
 
 	int unused_frame = next_unused_frame(pt);
 	if (unused_frame != NO_UNUSED_FRAMES) {
-		printf("frame #%d is unused\n", unused_frame);
+		//printf("frame #%d is unused\n", unused_frame);
 		swap_page(pt, page, unused_frame);
 	} else {
 		page_algo_handler(pt, page);
@@ -150,56 +153,28 @@ void page_fault_handler( struct page_table *pt, int page )
 	// sleep(1);
 }
 
-int main( int argc, char *argv[] )
-{
+int *run(int npages, int nframes, page_fault_handler_t handler, void (*program)(char *, int)) {
 	int i;
-	if(argc == 1 && !strcmp(argv[1], "test")) {
-		char *args[5];
-
-		args[0] = NULL;
-		args[1] =	"100";
-		args[2] =	"10";
-		args[3] =	"custom";
-		args[4] =	"scan";
-
-		main(5, args);
-
-		exit(EXIT_SUCCESS);
-	}
-
-	if(argc!=5) {
-		printf("use: virtmem <npages> <nframes> <rand|fifo|custom> <sort|scan|focus>\n");
-		return 1;
-	}
-
-	int npages = atoi(argv[1]);
-	int nframes = atoi(argv[2]);
-	const char *page_algo = argv[3];
-	const char *program = argv[4];
-
-	if(!strcmp(page_algo,"rand")) {
-		page_algo_handler = rand_handler;
-	} else if(!strcmp(page_algo,"fifo")) {
-		page_algo_handler = fifo_handler;
-	} else if(!strcmp(page_algo,"custom")) {
-		page_algo_handler = custom_handler;
-	} else {
-		fprintf(stderr,"unknown page replacement algorithm: %s\n", page_algo);
-		exit(EXIT_FAILURE);
-	}
+	page_algo_handler = handler;
 
 	disk = disk_open("myvirtualdisk",npages);
 	if(!disk) {
 		fprintf(stderr,"couldn't create virtual disk: %s\n",strerror(errno));
-		return 1;
+		exit(EXIT_FAILURE);
 	}
 
 	struct page_table *pt = page_table_create( npages, nframes, page_fault_handler );
 	if(!pt) {
 		fprintf(stderr,"couldn't create page table: %s\n",strerror(errno));
-		return 1;
+		exit(EXIT_FAILURE);
 	}
 
+	fi = 0;
+	disk_reads = 0;
+	disk_writes = 0;
+	page_faults = 0;
+
+	// Init frame table
 	ft = malloc(nframes * sizeof(int));
 	for (i = 0; i < nframes; ++i)
 	{
@@ -207,22 +182,9 @@ int main( int argc, char *argv[] )
 	}
 
 	char *virtmem = page_table_get_virtmem(pt);
-
 	physmem = page_table_get_physmem(pt);
 
-	if(!strcmp(program,"sort")) {
-		sort_program(virtmem,npages*PAGE_SIZE);
-
-	} else if(!strcmp(program,"scan")) {
-		scan_program(virtmem,npages*PAGE_SIZE);
-
-	} else if(!strcmp(program,"focus")) {
-		focus_program(virtmem,npages*PAGE_SIZE);
-
-	} else {
-		fprintf(stderr,"unknown program: %s\n", program);
-
-	}
+	program(virtmem,npages*PAGE_SIZE);
 
 	printf("Disk writes: %d\n", disk_writes);
 	printf("Disk reads:  %d\n", disk_reads);
@@ -232,5 +194,93 @@ int main( int argc, char *argv[] )
 	page_table_delete(pt);
 	disk_close(disk);
 
-	return 0;
+	int *stats = malloc(sizeof(int) * 3);
+	stats[0] = disk_reads;
+	stats[1] = disk_writes;
+	stats[2] = page_faults;
+
+	return stats;
+}
+
+void test() {
+	int pages = 100, frames = 10;
+
+	// fifo
+	printf("FIFO FOCUS:\n");
+	free(run(pages, frames, fifo_handler, focus_program));
+	printf("-----------------------\n");
+	printf("FIFO SORT:\n");
+	free(run(pages, frames, fifo_handler, sort_program));
+	printf("-----------------------\n");
+	printf("FIFO SCAN:\n");
+	free(run(pages, frames, fifo_handler, scan_program));
+	printf("-----------------------\n");
+
+	// rand
+	printf("RAND FOCUS:\n");
+	free(run(pages, frames, rand_handler, focus_program));
+	printf("-----------------------\n");
+	printf("RAND SORT:\n");
+	free(run(pages, frames, rand_handler, sort_program));
+	printf("-----------------------\n");
+	printf("RAND SCAN:\n");
+	free(run(pages, frames, rand_handler, scan_program));
+	printf("-----------------------\n");
+
+	// custom
+	printf("CUSTOM FOCUS:\n");
+	free(run(pages, frames, custom_handler, focus_program));
+	printf("-----------------------\n");
+	printf("CUSTOM SORT:\n");
+	free(run(pages, frames, custom_handler, sort_program));
+	printf("-----------------------\n");
+	printf("CUSTOM SCAN:\n");
+	free(run(pages, frames, custom_handler, scan_program));
+	printf("-----------------------\n");
+}
+
+int main( int argc, char *argv[] )
+{
+	if(argc == 2 && !strcmp(argv[1], "test")) {
+		test();
+		exit(EXIT_SUCCESS);
+	}
+
+	if(argc!=5) {
+		printf("use: virtmem <npages> <nframes> <rand|fifo|custom> <sort|scan|focus>\n");
+		exit(EXIT_FAILURE);
+	}
+
+	int npages = atoi(argv[1]);
+	int nframes = atoi(argv[2]);
+
+	const char *handler_str = argv[3];
+	const char *program_str = argv[4];
+
+	page_fault_handler_t handler;
+	void (*program)(char *, int);
+
+	if(!strcmp(handler_str,"rand")) {
+		handler = rand_handler;
+	} else if(!strcmp(handler_str,"fifo")) {
+		handler = fifo_handler;
+	} else if(!strcmp(handler_str,"custom")) {
+		handler = custom_handler;
+	} else {
+		fprintf(stderr,"unknown page replacement algorithm: %s\n", handler_str);
+		exit(EXIT_FAILURE);
+	}
+
+	if(!strcmp(program_str,"sort")) {
+		program = sort_program;
+	} else if(!strcmp(program_str,"scan")) {
+		program = scan_program;
+	} else if(!strcmp(program_str,"focus")) {
+		program = focus_program;
+	} else {
+		fprintf(stderr,"unknown program: %s\n", program_str);
+	}
+
+	run(npages, nframes, handler, program);
+	exit(EXIT_SUCCESS);
 }
