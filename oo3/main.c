@@ -9,7 +9,6 @@ how to use the page table and disk interfaces.
 #include "page_table.h"
 #include "disk.h"
 #include "program.h"
-#include "list.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,8 +16,11 @@ how to use the page table and disk interfaces.
 #include <errno.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <time.h>
 
 #define NO_UNUSED_FRAMES -1
+#define CLEAR_INTERVAL 5
+#define CUST_RAND_COUNT 10
 
 struct disk *disk;
 char *physmem;
@@ -32,21 +34,10 @@ int *ft;
 // Frame index
 int fi = 0;
 
-// Page queue
-List *pq;
-
 // Stats
 int disk_reads = 0;
 int disk_writes = 0;
 int page_faults = 0;
-
-void pq_add_page(int page) {
-	Node *node = node_new();
-	int *elm = malloc(sizeof(int));
-	*elm = page;
-	node->elm = elm;
-	list_add(pq, node);
-}
 
 /**
  * Evaluates if bits contains the PROT_READ flag.
@@ -110,18 +101,21 @@ void fifo_handler(struct page_table *pt, int page) {
 
 void custom_handler(struct page_table *pt, int page) {
 	int i, frame, bits, nframes = page_table_get_nframes(pt);
+	int rand_frames[CUST_RAND_COUNT];
 
-	for (frame = fi, i = 0; i < nframes; frame++, i++)
-	{
-		page_table_get_entry(pt, ft[frame % nframes], &frame, &bits);
+	for (i = 0; i < CUST_RAND_COUNT; ++i) {
+		rand_frames[i] = lrand48() % nframes;
+	}
+
+	for (i = 0; i < CUST_RAND_COUNT; ++i) {
+		page_table_get_entry(pt, ft[rand_frames[i]], &frame, &bits);
 		if (!has_write(bits)) {
-			swap_page(pt, page, frame % nframes);
-			fi = frame;
+			swap_page(pt, page, frame);
 			return;
 		}
 	}
 
-	fifo_handler(pt, page);
+	swap_page(pt, page, frame);
 }
 
 void page_fault_handler( struct page_table *pt, int page )
@@ -158,6 +152,21 @@ void page_fault_handler( struct page_table *pt, int page )
 
 int main( int argc, char *argv[] )
 {
+	int i;
+	if(argc == 1 && !strcmp(argv[1], "test")) {
+		char *args[5];
+
+		args[0] = NULL;
+		args[1] =	"100";
+		args[2] =	"10";
+		args[3] =	"custom";
+		args[4] =	"scan";
+
+		main(5, args);
+
+		exit(EXIT_SUCCESS);
+	}
+
 	if(argc!=5) {
 		printf("use: virtmem <npages> <nframes> <rand|fifo|custom> <sort|scan|focus>\n");
 		return 1;
@@ -192,7 +201,6 @@ int main( int argc, char *argv[] )
 	}
 
 	ft = malloc(nframes * sizeof(int));
-	int i;
 	for (i = 0; i < nframes; ++i)
 	{
 		ft[i] = -1;
